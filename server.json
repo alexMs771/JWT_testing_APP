@@ -1,8 +1,7 @@
 {
     "name":"testing",
     "JVM":{
-        "heapSize":"320",
-        "javaVersion":"openjdk21_jre"
+        "heapSize":"320"
     },
     "app":{
         "cfengine":"boxlang"

@@ -20,7 +20,12 @@ LABEL repository="https://github.com/Ortus-Solutions/docker-commandbox"
 
 # Force the engine for the container (the base image env overrides server.json,
 # which stays on boxlang for local development).
-ENV BOX_SERVER_APP_CFENGINE="lucee@6"
+# Pin an EXACT version: with a loose version like "lucee@6", CommandBox makes a
+# ForgeBox network call at every server start ("determining the latest version").
+# On Render's deploy network that call stalls, so the startup script is never
+# generated and the server never binds a port ("No open ports detected"). An
+# exact version skips the lookup and starts deterministically offline.
+ENV BOX_SERVER_APP_CFENGINE="lucee@6.2.7"
 
 # Relocate the app off the default /app directory. This app's ColdBox mapping is
 # "/app" (-> <root>/app), so hosting the code at the OS path /app collides: any

@@ -2,11 +2,10 @@
     "name":"testing",
     "JVM":{
         "heapSize":"512",
-        "javaVersion":"openjdk21_jre",
-        "args":"-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=8888"
+        "javaVersion":"openjdk21_jre"
     },
     "app":{
-        "cfengine":"adobe@2025"
+        "cfengine":"boxlang"
     },
     "web":{
         "webroot":"public",

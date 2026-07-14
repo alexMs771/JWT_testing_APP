@@ -10,6 +10,9 @@
     "web":{
         "webroot":"public",
         "host":"0.0.0.0",
+        "http":{
+            "port":"${PORT:8080}"
+        },
         "rewrites":{
             "enable":true
         },

@@ -1,7 +1,7 @@
 {
     "name":"testing",
     "JVM":{
-        "heapSize":"512",
+        "heapSize":"320",
         "javaVersion":"openjdk21_jre"
     },
     "app":{
@@ -9,6 +9,7 @@
     },
     "web":{
         "webroot":"public",
+        "host":"0.0.0.0",
         "rewrites":{
             "enable":true
         },

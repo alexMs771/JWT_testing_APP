@@ -1,0 +1,24 @@
+# Render Blueprint for the JWT Testing App (ColdBox + BoxLang)
+# Docs: https://render.com/docs/blueprint-spec
+#
+# This builds the existing Docker image (docker/Dockerfile) and hosts it as a
+# free web service. Render injects PORT automatically; the CommandBox image binds to it.
+services:
+  - type: web
+    name: jwt-testing-app
+    runtime: docker
+    dockerfilePath: ./docker/Dockerfile
+    dockerContext: .
+    plan: free
+    region: singapore
+    branch: main
+    autoDeploy: true
+    healthCheckPath: /healthcheck
+    envVars:
+      # Signing key for cf-token-manager. Render generates a strong random value.
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ENVIRONMENT
+        value: production
+      - key: APPNAME
+        value: JWT Testing App

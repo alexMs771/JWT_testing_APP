@@ -60,10 +60,30 @@ component extends="coldbox.system.EventHandler" {
 	}
 
 	function onException( event, rc, prc ){
-		event.setHTTPHeader( statusCode = 500 );
-		// Grab Exception From private request collection, placed by ColdBox Exception Handling
-		var exception = prc.exception;
-		// Place exception handler below:
+		// Grab the exception placed by ColdBox's exception handling (guard against
+		// it being missing so the handler itself can never throw/loop).
+		var exception = prc.keyExists( "exception" ) ? prc.exception : {};
+		var message   = ( isStruct( exception ) && exception.keyExists( "message" ) ) ? exception.message : "Unknown error";
+		var detail    = ( isStruct( exception ) && exception.keyExists( "detail" ) )  ? exception.detail  : "";
+
+		// Print the full error to stdout so it is visible in the Render "Logs" tab.
+		systemOutput( "=== UNHANDLED EXCEPTION ===", true );
+		systemOutput( "message: " & message, true );
+		systemOutput( "detail : " & detail, true );
+		if ( isStruct( exception ) && exception.keyExists( "stacktrace" ) ) {
+			systemOutput( exception.stacktrace, true );
+		}
+
+		// Return a real, visible response instead of a blank body.
+		return event.renderData(
+			type       = "HTML",
+			statusCode = 500,
+			data       = "<!doctype html><html><body style='font-family:system-ui;padding:2rem'>"
+				& "<h2>Something went wrong</h2>"
+				& "<p>" & encodeForHTML( message ) & "</p>"
+				& "<pre style='white-space:pre-wrap;color:##555'>" & encodeForHTML( detail ) & "</pre>"
+				& "</body></html>"
+		);
 	}
 
 }

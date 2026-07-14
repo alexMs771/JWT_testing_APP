@@ -15,7 +15,10 @@ component {
 	this.sessionManagement = true;
 	this.sessionTimeout    = createTimespan( 0, 0, 30, 0 );
 	this.setClientCookies  = true;
-	this.setDomainCookies     = true;
+	// Host-only cookies. Domain-level cookies are rejected by browsers on shared
+	// public-suffix hosts like *.onrender.com, which silently breaks the session
+	// (login succeeds but the next request no longer sees the session).
+	this.setDomainCookies     = false;
 	this.timezone             = "UTC";
 	this.whiteSpaceManagement = "smart";
 

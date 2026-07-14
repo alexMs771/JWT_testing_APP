@@ -7,13 +7,27 @@
 # docker run -it -p 8080:8080 my-coldbox-app
 ################################################################
 
-# We pull the latest image, you can change this to a specific tag or CFML engine, which we recommend.
+# Lucee 6 (free, open-source CFML engine). Lucee runs ColdBox reliably and
+# honors Application.cfc this.mappings during onApplicationStart, unlike the
+# baked BoxLang engine in this image family, whose class resolver does not
+# register those mappings in time for the framework to bootstrap.
 # https://hub.docker.com/r/ortussolutions/commandbox
-FROM ortussolutions/commandbox:boxlang
+FROM ortussolutions/commandbox:lucee6
 
 # Metadata
 LABEL maintainer="Ortus Solutions <info@ortussolutions.com>"
 LABEL repository="https://github.com/Ortus-Solutions/docker-commandbox"
+
+# Force the engine for the container (the base image env overrides server.json,
+# which stays on boxlang for local development).
+ENV BOX_SERVER_APP_CFENGINE="lucee@6"
+
+# Relocate the app off the default /app directory. This app's ColdBox mapping is
+# "/app" (-> <root>/app), so hosting the code at the OS path /app collides: any
+# absolute path the framework builds (e.g. /app/app/helpers/ApplicationHelper.cfm)
+# starts with "/app" and gets re-mapped, producing a broken /app/app/app/... path.
+# A non-colliding root avoids this entirely.
+ENV APP_DIR="/srv/coldbox"
 
 # ColdBox Healthcheck
 ENV HEALTHCHECK_URI="http://127.0.0.1:${PORT}/healthcheck"

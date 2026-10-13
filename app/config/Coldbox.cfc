@@ -13,6 +13,8 @@ component {
 		 * you create the appropriate functions and define the environment in your .env or
 		 * in the `environments` struct.
 		 */
+		var isProduction = compareNoCase( getSystemSetting( "ENVIRONMENT", "development" ), "production" ) == 0;
+
 		variables.coldbox = {
 			// Application Setup
 			appName                  : getSystemSetting( "APPNAME", "Your app name here" ),
@@ -20,7 +22,7 @@ component {
 			// Development Settings
 			reinitPassword           : "",
 			reinitKey                : "fwreinit",
-			handlersIndexAutoReload  : true,
+			handlersIndexAutoReload  : !isProduction,
 			// Implicit Events
 			defaultEvent             : "security.login",
 			requestStartHandler      : "Main.onRequestStart",

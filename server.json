@@ -1,7 +1,13 @@
 {
     "name":"testing",
     "JVM":{
-        "heapSize":"192"
+        "heapSize":"128",
+        "minHeapSize":"64",
+        "args":[
+            "-XX:MaxMetaspaceSize=128m",
+            "-XX:ReservedCodeCacheSize=32m",
+            "-Xss512k"
+        ]
     },
     "app":{
         "cfengine":"boxlang"

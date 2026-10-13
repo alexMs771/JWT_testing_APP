@@ -37,6 +37,10 @@ ENV APP_DIR="/srv/coldbox"
 # ColdBox Healthcheck
 ENV HEALTHCHECK_URI="http://127.0.0.1:${PORT}/healthcheck"
 
+# Render web services use PORT=10000 by default.  Keep the image metadata
+# aligned with that port; the application still reads the runtime PORT value.
+EXPOSE 10000
+
 # Copy application files to root - Uses .dockerignore to ignore files
 COPY ./ ${APP_DIR}/
 
@@ -45,6 +49,16 @@ RUN cd ${APP_DIR} && box install --production
 
 # WARM UP THE SERVER
 RUN ${BUILD_DIR}/util/warmup-server.sh
+
+# Generate CommandBox's authoritative startup script while the image is being
+# built.  Without this, run.sh repeats server discovery and startup-script
+# generation every time the Render instance starts.  That work is large enough
+# to exceed Render Free's 512 MiB limit before the HTTP port opens.
+#
+# PORT is scoped to this build command so the generated server uses Render's
+# default port, while runtime environment variables (including JWT_SECRET)
+# remain available to the application.
+RUN set -e; export PORT=10000; export FINALIZE_STARTUP=true; ${BUILD_DIR}/run.sh; unset FINALIZE_STARTUP
 
 # Run it
 CMD ["/bin/bash", "-c", "$BUILD_DIR/run.sh"]

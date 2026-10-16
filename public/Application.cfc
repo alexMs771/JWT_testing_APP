@@ -11,14 +11,19 @@ component {
 	 * Application Properties: Modify as you see fit!
 	 * --------------------------------------------------------------------------
 	 */
-	this.name              = "ColdBox Application";
+	this.name              = "DuePilot";
 	this.sessionManagement = true;
-	this.sessionTimeout    = createTimespan( 0, 0, 30, 0 );
+	this.sessionTimeout    = createTimespan( 0, 8, 0, 0 );
 	this.setClientCookies  = true;
 	// Host-only cookies. Domain-level cookies are rejected by browsers on shared
 	// public-suffix hosts like *.onrender.com, which silently breaks the session
 	// (login succeeds but the next request no longer sees the session).
 	this.setDomainCookies     = false;
+	this.sessionCookie        = {
+		httpOnly: true,
+		secure  : compareNoCase( getSystemSetting( "ENVIRONMENT", "development" ), "production" ) == 0,
+		sameSite: "Lax"
+	};
 	this.timezone             = "UTC";
 	this.whiteSpaceManagement = "smart";
 
@@ -76,7 +81,19 @@ component {
 	 * ORM + Datasource Settings
 	 * --------------------------------------------------------------------------
 	 */
-	this.datasource = "coldbox"
+	// PostgreSQL is enabled only when DATA_MODE=postgres. Demo mode remains
+	// database-free so contributors can run the product immediately.
+	if ( compareNoCase( getSystemSetting( "DATA_MODE", "demo" ), "postgres" ) == 0 ) {
+		this.datasources[ "duepilot" ] = {
+			driver   : "postgresql",
+			host     : getSystemSetting( "DB_HOST", "127.0.0.1" ),
+			port     : val( getSystemSetting( "DB_PORT", "5432" ) ),
+			database : getSystemSetting( "DB_DATABASE", "duepilot" ),
+			username : getSystemSetting( "DB_USER", "duepilot" ),
+			password : getSystemSetting( "DB_PASSWORD", "" )
+		};
+		this.datasource = "duepilot";
+	}
 
 	/**
 	 * Fires when the application starts

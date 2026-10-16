@@ -1,73 +1,92 @@
-################################################################################
-# ColdBox Docker Compose Stack
-# This can be used to quickly run your ColdBox application in a CommandBox based Docker Container.
-#
-# We pull the latest image, you can change this to a specific tag or CFML engine, which we recommend.
-# https://hub.docker.com/repository/docker/ortussolutions/commandbox
-#
-# Database
-# - We give you three databases for you to choose from below: MySQL 8, PostgreSQL, Azure MSSQL
-################################################################################
+name: duepilot
+
 services:
-
-  ## PostgreSQL
-  # coldbox_db:
-  #   image: postgres:12
-  #   environment:
-  #     POSTGRES_PASSWORD: "coldbox"
-  #     POSTGRES_USER: "coldbox"
-  #     POSTGRES_DB: "coldbox"
-  #   ports:
-  #     - 5432:5432
-  #   volumes:
-  #     - .db/postgres/initdb:/docker-entrypoint-initdb.d
-  #     - .db/postgres/data:/var/lib/postgresql/data
-
-  # mssql:
-  #   image: mcr.microsoft.com/azure-sql-edge:latest
-  #   ports:
-  #     - "1434:1433"
-  #   environment:
-  #     SA_PASSWORD: "T35t1ng1234!"
-  #     ACCEPT_EULA: "Y"
-  #   volumes:
-  #     - .db/mssql/tmp:/tmp/mssql
-
-  # MySQL Server 8
-  coldbox_db:
-    image: mysql:8
-    ports:
-      - "4306:3306"
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
     environment:
-      MYSQL_DATABASE: "coldbox"
-      MYSQL_ROOT_PASSWORD: "coldbox"
+      POSTGRES_DB: "${DB_DATABASE:-duepilot}"
+      POSTGRES_USER: "${DB_USER:-duepilot}"
+      POSTGRES_PASSWORD: "${DB_PASSWORD:-duepilot-local-password}"
+    ports:
+      - "${DB_PUBLIC_PORT:-5432}:5432"
     volumes:
-      # Store the data locally
-      - .db/mysql8/data:/var/lib/mysql
-      # You can uncomment and it will seed the db with our prepared sql data
-      #- ../resources/sql/mysql:/docker-entrypoint-initdb.d
+      - duepilot_postgres:/var/lib/postgresql/data
+      - ../database/migrations/001_foundation.sql:/docker-entrypoint-initdb.d/001_foundation.sql:ro
+      - ../database/migrations/002_identity_admin_and_profiles.sql:/docker-entrypoint-initdb.d/002_identity_admin_and_profiles.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
 
-  # ColdBox Site
-  coldbox_app:
+  backend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: duepilot-backend:local
+    # The Compose file lives in docker/, while local secrets live at the
+    # repository root. Load that file explicitly so `docker compose -f ...`
+    # works consistently from any working directory.
+    env_file:
+      - ../.env
+    init: true
+    restart: unless-stopped
     depends_on:
-      - coldbox_db
-    image: ortussolutions/commandbox:boxlang
-    # Environment Variables
+      postgres:
+        condition: service_healthy
     environment:
-      CFCONFIG_ADMINPASSWORD: coldbox
-      ENVIRONMENT: DEVELOPMENT
-      # JWT_SECRET: mySecret
-      DB_HOST: coldbox_db
-      DB_PORT: 4306
-      DB_DATABASE: coldbox
-      DB_DRIVER: MySQL
-      DB_USER: root
-      DB_PASSWORD: coldbox
-      DB_CONNECTIONSTRING: jdbc:mysql://127.0.0.1:3306/coldbox?useSSL=false&useUnicode=true&characterEncoding=UTF-8&serverTimezone=UTC&useLegacyDatetimeCode=true
-    # Ports
+      PORT: 8080
+      ENVIRONMENT: development
+      APPNAME: DuePilot
+      DATA_MODE: "${DATA_MODE:-postgres}"
+      APP_DIR: /srv/coldbox
+      JWT_SECRET: "${JWT_SECRET:-local-development-secret-change-me}"
+      AI_ASSISTANT_ENABLED: "${AI_ASSISTANT_ENABLED:-true}"
+      AI_FALLBACK_ENABLED: "${AI_FALLBACK_ENABLED:-true}"
+      GROQ_MODEL: "${GROQ_MODEL:-openai/gpt-oss-20b}"
+      GROQ_TIMEOUT_SECONDS: "${GROQ_TIMEOUT_SECONDS:-12}"
+      GROQ_MAX_TOKENS: "${GROQ_MAX_TOKENS:-700}"
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_DATABASE: "${DB_DATABASE:-duepilot}"
+      DB_DRIVER: postgresql
+      DB_USER: "${DB_USER:-duepilot}"
+      DB_PASSWORD: "${DB_PASSWORD:-duepilot-local-password}"
+      DB_CONNECTIONSTRING: "jdbc:postgresql://postgres:5432/${DB_DATABASE:-duepilot}"
     ports:
-      - "8080:8080"
-      - "8443:8443"
-    # Data & Overrides
-    volumes:
-      - ../:/app
+      - "${APP_PORT:-8080}:8080"
+    mem_limit: 512m
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/healthcheck"]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+      start_period: 45s
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    image: duepilot-frontend:local
+    init: true
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      PORT: 3000
+      DUEPILOT_API_URL: http://backend:8080
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    mem_limit: 384m
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:3000/"]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+
+volumes:
+  duepilot_postgres:

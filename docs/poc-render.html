@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<base href="../">
+<title>cf-token-manager POC</title>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<style>
+  @page { size: A4; margin: 16mm 14mm; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Segoe UI", Arial, Helvetica, sans-serif;
+    color: #1f2430; line-height: 1.5; font-size: 12.5px;
+    max-width: 900px; margin: 0 auto; padding: 8px 4px;
+  }
+  h1 { font-size: 26px; color: #0d1b3e; border-bottom: 3px solid #2d6cdf; padding-bottom: 6px; margin-top: 8px; }
+  h2 { font-size: 19px; color: #17408b; border-bottom: 1px solid #d6def0; padding-bottom: 4px; margin-top: 26px; page-break-after: avoid; }
+  h3 { font-size: 15px; color: #24324d; margin-top: 18px; page-break-after: avoid; }
+  h4 { font-size: 13px; color: #24324d; }
+  p, li { orphans: 3; widows: 3; }
+  a { color: #2d6cdf; text-decoration: none; }
+  blockquote { border-left: 4px solid #2d6cdf; background: #f2f6ff; margin: 12px 0; padding: 6px 14px; color: #33415c; border-radius: 4px; }
+  code { background: #eef1f6; padding: 1px 5px; border-radius: 4px; font-family: "Consolas", "SFMono-Regular", monospace; font-size: 11.5px; color: #b5257f; }
+  pre { background: #0d1b2a; color: #e6edf3; padding: 12px 14px; border-radius: 8px; overflow-x: auto; page-break-inside: avoid; }
+  pre code { background: none; color: #e6edf3; padding: 0; font-size: 11px; }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 11.5px; page-break-inside: avoid; }
+  th, td { border: 1px solid #cdd6e6; padding: 6px 9px; text-align: left; vertical-align: top; }
+  th { background: #eaf0fb; color: #17408b; }
+  tr:nth-child(even) td { background: #f7f9fd; }
+  img { max-width: 100%; height: auto; border: 1px solid #d6def0; border-radius: 8px; margin: 10px 0; box-shadow: 0 2px 8px rgba(13,27,62,.08); page-break-inside: avoid; }
+  .mermaid { background: #fbfcfe; border: 1px solid #e3e9f5; border-radius: 10px; padding: 12px; margin: 14px 0; text-align: center; page-break-inside: avoid; }
+  /* Cap diagram size so a tall flowchart scales down to fit a single page instead
+     of overflowing and leaving blank pages before it. */
+  .mermaid svg { max-width: 100% !important; width: auto !important; height: auto !important; max-height: 225mm !important; }
+  hr { border: none; border-top: 1px solid #d6def0; margin: 22px 0; }
+  h2, h3 { page-break-inside: avoid; }
+</style>
+</head>
+<body>
+<div id="content">Loading…</div>
+
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({ startOnLoad: false, securityLevel: 'loose', theme: 'default', flowchart: { htmlLabels: true, useMaxWidth: false } });
+
+  const md = await (await fetch('POC-cf-token-manager.md')).text();
+  document.getElementById('content').innerHTML = marked.parse(md);
+
+  // Turn ```mermaid code blocks into <div class="mermaid"> for rendering.
+  document.querySelectorAll('code.language-mermaid').forEach(el => {
+    const div = document.createElement('div');
+    div.className = 'mermaid';
+    div.textContent = el.textContent;
+    el.parentElement.replaceWith(div);
+  });
+
+  try {
+    await mermaid.run({ querySelector: '.mermaid' });
+  } catch (e) {
+    console.error('mermaid error', e);
+  }
+  // Signal readiness for the PDF printer.
+  document.title = 'READY cf-token-manager POC';
+  document.body.setAttribute('data-ready', '1');
+</script>
+</body>
+</html>

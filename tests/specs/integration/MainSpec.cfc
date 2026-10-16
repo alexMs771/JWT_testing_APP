@@ -1,103 +1,122 @@
-/*******************************************************************************
- *	Integration Test as BDD
- *
- *	Extends the integration class: coldbox.system.testing.BaseTestCase
- *
- *	so you can test your ColdBox application headlessly. The 'appMapping' points by default to
- *	the '/app' mapping created in the test folder Application.cfc.  Please note that this
- *	Application.cfc must mimic the real one in your root, including ORM settings if needed.
- *
- *	The 'execute()' method is used to execute a ColdBox event, with the following arguments
- *	* event : the name of the event
- *	* private : if the event is private or not
- *	* prePostExempt : if the event needs to be exempt of pre post interceptors
- *	* eventArguments : The struct of args to pass to the event
- *	* renderResults : Render back the results of the event
- *******************************************************************************/
 component extends="coldbox.system.testing.BaseTestCase" appMapping="/app" {
-
-	/*********************************** LIFE CYCLE Methods ***********************************/
 
 	function beforeAll(){
 		super.beforeAll();
-		// do your own stuff here
+		variables.duePilot = getWireBox().getInstance( "DuePilotService" );
+		variables.duePilotAi = getWireBox().getInstance( "DuePilotAiService" );
 	}
 
 	function afterAll(){
-		// do your own stuff here
+		variables.duePilot.resetDemoData();
 		super.afterAll();
 	}
 
-	/*********************************** BDD SUITES ***********************************/
-
 	function run(){
-		describe( "Main Handler", function(){
-			beforeEach( function( currentSpec ){
-				// Setup as a new ColdBox request, VERY IMPORTANT. ELSE EVERYTHING LOOKS LIKE THE SAME REQUEST.
+		describe( "DuePilot v1 domain", function(){
+			beforeEach( function(){
 				setup();
+				variables.duePilot.resetDemoData();
 			} );
 
-			it( "can render the homepage", function(){
-				var event = this.get( "main.index" );
-				expect( event.getValue( name = "welcomemessage", private = true ) ).toBe( "Welcome to ColdBox!" );
+			it( "builds the receivables dashboard from seeded invoices", function(){
+				var dashboard = variables.duePilot.getDashboard();
+				expect( dashboard.outstanding ).toBeGT( 0 );
+				expect( dashboard.overdueCount ).toBeGT( 0 );
+				expect( dashboard.priorityInvoices ).notToBeEmpty();
+				expect( dashboard.aging.total ).toBe( dashboard.outstanding );
 			} );
 
-			it( "can render some restful data", function(){
-				var event = this.post( "main.data" );
-
-				debug( event.getHandlerResults() );
-				expect( event.getRenderedContent() ).toBeJSON();
-			} );
-
-			it( "can do a relocation", function(){
-				var event = execute( event = "main.doSomething" );
-				expect( event.getValue( "relocate_event", "" ) ).toBe( "main.index" );
-			} );
-
-			it( "can startup executable code", function(){
-				var event = execute( "main.onAppInit" );
-			} );
-
-			it( "can handle exceptions", function(){
-				// You need to create an exception bean first and place it on the request context FIRST as a setup.
-				var exceptionBean = createMock( "coldbox.system.web.context.ExceptionBean" ).init(
-					erroStruct   = structNew(),
-					extramessage = "My unit test exception",
-					extraInfo    = "Any extra info, simple or complex"
+			it( "creates an invoice and exposes it in the customer portal", function(){
+				var invoice = variables.duePilot.createInvoice(
+					customerId = "cus-atlas",
+					amount     = 125000,
+					issueDate  = dateFormat( now(), "yyyy-mm-dd" ),
+					dueDate    = dateFormat( dateAdd( "d", 30, now() ), "yyyy-mm-dd" ),
+					description = "Test invoice"
 				);
-				prepareMock( getRequestContext() )
-					.setValue(
-						name    = "exception",
-						value   = exceptionBean,
-						private = true
-					)
-					.$( "setHTTPHeader" );
-
-				// TEST EVENT EXECUTION
-				var event = execute( "main.onException" );
+				var portalInvoice = variables.duePilot.getInvoiceByPortalToken( invoice.portalToken );
+				expect( portalInvoice.id ).toBe( invoice.id );
+				expect( portalInvoice.outstanding ).toBe( 125000 );
 			} );
 
-			describe( "Request Events", function(){
-				it( "fires on start", function(){
-					var event = execute( "main.onRequestStart" );
-				} );
+			it( "moves an invoice through promise, dispute and payment", function(){
+				variables.duePilot.savePromise( "inv-1047", dateFormat( dateAdd( "d", 5, now() ), "yyyy-mm-dd" ), "Confirmed" );
+				expect( variables.duePilot.getInvoice( "inv-1047" ).promiseDate ).notToBeEmpty();
 
-				it( "fires on end", function(){
-					var event = execute( "main.onRequestEnd" );
-				} );
+				variables.duePilot.openDispute( "inv-1047", "Purchase order mismatch" );
+				expect( variables.duePilot.getInvoice( "inv-1047" ).status ).toBe( "disputed" );
+
+				variables.duePilot.recordPayment( "inv-1047", 45000, "TEST-UTR" );
+				var paidInvoice = variables.duePilot.getInvoice( "inv-1047" );
+				expect( paidInvoice.status ).toBe( "paid" );
+				expect( paidInvoice.outstanding ).toBe( 0 );
 			} );
 
-			describe( "Session Events", function(){
-				it( "fires on start", function(){
-					var event = execute( "main.onSessionStart" );
-				} );
+			it( "rejects invalid invoice dates without creating data", function(){
+				var beforeCount = variables.duePilot.listInvoices().len();
+				var errorType = "";
+				try {
+					variables.duePilot.createInvoice(
+						customerId = "cus-atlas",
+						amount = 125000,
+						issueDate = dateFormat( now(), "yyyy-mm-dd" ),
+						dueDate = dateFormat( dateAdd( "d", -1, now() ), "yyyy-mm-dd" ),
+						description = "Invalid date range"
+					);
+				} catch ( any error ) {
+					errorType = error.type;
+				}
+				expect( errorType ).toBe( "DuePilot.InvalidDateRange" );
+				expect( variables.duePilot.listInvoices().len() ).toBe( beforeCount );
+			} );
 
-				it( "fires on end", function(){
-					// Place a fake session structure here, it mimics what the handler receives
-					URL.sessionReference     = structNew();
-					URL.applicationReference = structNew();
-					var event                = execute( "main.onSessionEnd" );
-				} );
+			it( "rejects overpayments without changing the balance", function(){
+				var beforeInvoice = variables.duePilot.getInvoice( "inv-1047" );
+				var errorType = "";
+				try {
+					variables.duePilot.recordPayment( "inv-1047", beforeInvoice.outstanding + 1, "TOO-MUCH" );
+				} catch ( any error ) {
+					errorType = error.type;
+				}
+				expect( errorType ).toBe( "DuePilot.Overpayment" );
+				expect( variables.duePilot.getInvoice( "inv-1047" ).outstanding ).toBe( beforeInvoice.outstanding );
+			} );
+
+			it( "validates and saves workspace settings", function(){
+				var organization = variables.duePilot.updateOrganization(
+					name = "Northstar Labs",
+					currency = "INR",
+					financeEmail = "billing@northstar.example",
+					defaultTerms = 45
+				);
+				expect( organization.name ).toBe( "Northstar Labs" );
+				expect( organization.initials ).toBe( "NL" );
+				expect( organization.defaultTerms ).toBe( 45 );
+			} );
+
+			it( "builds a minimal AI context without customer secrets", function(){
+				var context = variables.duePilot.getAssistantContext();
+				expect( context.summary.outstanding ).toBeGT( 0 );
+				expect( context.priorities ).notToBeEmpty();
+				expect( structKeyExists( context.priorities[ 1 ], "portalToken" ) ).toBeFalse();
+				expect( structKeyExists( context.priorities[ 1 ], "customerEmail" ) ).toBeFalse();
+			} );
+
+			it( "provides useful guided AI responses before a Groq key is added", function(){
+				var status = variables.duePilotAi.getStatus();
+				expect( status.enabled ).toBeTrue();
+				expect( status.provider ).toInclude( "BoxLang AI" );
+				if ( status.configured ) {
+					expect( status.keyCount ).toBeGT( 0 );
+				} else {
+					expect( status.keyCount ).toBe( 0 );
+				}
+				if ( !status.configured ) {
+					var result = variables.duePilotAi.chat( "Prioritize today's collections" );
+					expect( result.ok ).toBeTrue();
+					expect( result.mode ).toBe( "guided" );
+					expect( result.answer ).toInclude( "recommended collection order" );
+				}
 			} );
 		} );
 	}

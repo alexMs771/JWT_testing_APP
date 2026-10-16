@@ -1,9 +1,22 @@
 # All the files to ignore from the docker image
 .engine
+.git
 .github
 .vscode
 .DS_Store
 .dockerignore
+.env
+.env.*
+!.env.example
 lib/testbox
 resources
 tests
+frontend
+node_modules
+**/node_modules
+**/.next
+app/logs
+*.docx
+*.pdf
+*.pptx
+*.zip

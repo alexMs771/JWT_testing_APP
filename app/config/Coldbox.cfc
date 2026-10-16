@@ -17,14 +17,14 @@ component {
 
 		variables.coldbox = {
 			// Application Setup
-			appName                  : getSystemSetting( "APPNAME", "Your app name here" ),
+			appName                  : getSystemSetting( "APPNAME", "DuePilot" ),
 			eventName                : "event",
 			// Development Settings
 			reinitPassword           : "",
 			reinitKey                : "fwreinit",
 			handlersIndexAutoReload  : !isProduction,
 			// Implicit Events
-			defaultEvent             : "security.login",
+			defaultEvent             : "main.index",
 			requestStartHandler      : "Main.onRequestStart",
 			requestEndHandler        : "",
 			applicationStartHandler  : "Main.onAppInit",
@@ -61,7 +61,21 @@ component {
 		 * Custom Settings
 		 * --------------------------------------------------------------------------
 		 */
-		variables.settings = {};
+		variables.settings = {
+			aiAssistant : {
+				enabled         : getSystemSetting( "AI_ASSISTANT_ENABLED", "true" ),
+				fallbackEnabled : getSystemSetting( "AI_FALLBACK_ENABLED", "true" ),
+				provider        : "groq",
+				apiKey          : getSystemSetting( "GROQ_API_KEY", "" ),
+				apiKey2         : getSystemSetting( "GROQ_API_KEY_2", "" ),
+				apiKey3         : getSystemSetting( "GROQ_API_KEY_3", "" ),
+				apiKey4         : getSystemSetting( "GROQ_API_KEY_4", "" ),
+				apiKeys         : getSystemSetting( "GROQ_API_KEYS", "" ),
+				model           : getSystemSetting( "GROQ_MODEL", "openai/gpt-oss-20b" ),
+				timeout         : val( getSystemSetting( "GROQ_TIMEOUT_SECONDS", "12" ) ),
+				maxTokens       : val( getSystemSetting( "GROQ_MAX_TOKENS", "700" ) )
+			}
+		};
 
 		/**
 		 * --------------------------------------------------------------------------
@@ -149,13 +163,13 @@ component {
 			// cf-token-manager lifecycle policy.
 			// ---------------------------------------------------------------
 			// THIS is where the developer decides how long a session lives.
-			// Short values are used here so the whole lifecycle (expire ->
-			// silent refresh -> auto logout) can be seen live in ~2 minutes.
-			// Production values would typically be 900 / 2592000.
+			// Product defaults: 15-minute access tokens with a 30-day refresh
+			// window. The refresh endpoint rotates access credentials without
+			// forcing the finance user to repeatedly sign in.
 			// ---------------------------------------------------------------
 			"cf-token-manager" : {
-				accessTokenExpiry  : 30,   
-				refreshTokenExpiry : 120 
+				accessTokenExpiry  : 900,
+				refreshTokenExpiry : 2592000
 			}
 		};
 

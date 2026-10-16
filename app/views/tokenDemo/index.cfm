@@ -28,30 +28,22 @@
 	}
 </cfscript>
 <cfoutput>
-<style>
-	.tm-hero { background: linear-gradient( 135deg, ##0d1b3e 0%, ##17408b 55%, ##2d6cdf 100% ); color:##fff; border-radius:1rem; }
-	.tm-code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-	.tm-token { word-break: break-all; font-family: ui-monospace, monospace; font-size:.78rem; }
-	.tm-fn-badge { font-family: ui-monospace, monospace; }
-	.tm-sticky-sum { position: sticky; top: 0; z-index: 5; }
-</style>
-
-<div class="py-4" style="max-width:1100px; margin:0 auto;">
+<div class="token-lab">
 
 	<!--- ===================== HERO ===================== --->
-	<div class="tm-hero p-4 p-md-5 mb-4 shadow">
+	<div class="tm-hero p-4 p-md-5 mb-4">
 		<div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
 			<div>
-				<div class="text-uppercase small fw-semibold opacity-75 mb-1">Ortus-style ColdBox Module &bull; Live Demo</div>
-				<h1 class="fw-bold mb-2"><i class="bi bi-shield-lock"></i> cf-token-manager</h1>
+				<div class="tm-kicker"><span></span> DuePilot Labs &bull; Security engineering</div>
+				<h1 class="fw-bold mb-2"><i class="bi bi-shield-lock"></i> JWT lifecycle diagnostics</h1>
 				<p class="mb-0 opacity-75" style="max-width:640px;">
-					A JWT token-lifecycle manager. This console exercises every public function
+					A live engineering console for <span class="tm-code">cf-token-manager</span>. It exercises every public function
 					&mdash; <span class="tm-code">issue()</span>, <span class="tm-code">decode()</span>,
 					<span class="tm-code">verify()</span>, <span class="tm-code">refresh()</span> &mdash;
 					plus the <span class="tm-code">validate()/diagnose()</span> diagnostics, across all success and failure dimensions.
 				</p>
 			</div>
-			<div class="text-end">
+			<div class="tm-policy-grid">
 				<div class="badge bg-light text-dark mb-1 d-block">alg: #encodeForHTML( prc.policy.algorithm )#</div>
 				<div class="badge bg-light text-dark mb-1 d-block">issuer: #encodeForHTML( prc.policy.issuer )#</div>
 				<div class="badge bg-light text-dark mb-1 d-block">access TTL: #ttlText( prc.policy.accessTokenExpiry )#</div>
@@ -246,7 +238,7 @@
 	</div>
 
 	<p class="text-center text-muted small mt-4 mb-0">
-		cf-token-manager v1.0.0 &bull; HMAC signing via the JVM (portable across Adobe CF, Lucee &amp; BoxLang)
+		cf-token-manager v1.0.0 &bull; HMAC signing through the JVM &bull; BoxLang runtime
 	</p>
 </div>
 </cfoutput>

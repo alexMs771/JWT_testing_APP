@@ -1,150 +1,108 @@
-/**
- * Security — the demo application that shows the cf-token-manager lifecycle
- * the way a real app uses it:
- *
- *   1. User logs in            -> issue()  mints an access + refresh token pair
- *   2. Tokens are shown live   -> decode() reads iat/exp for the countdowns
- *   3. Access token expires     -> refresh() silently mints a new access token
- *   4. Refresh token expires    -> the user is logged out automatically
- *
- * Token lifetimes are configured by the developer in
- * config/Coldbox.cfc -> moduleSettings["cf-token-manager"].
- */
+/** Authentication and JWT session lifecycle for DuePilot. */
 component extends="coldbox.system.EventHandler" {
 
 	property name="tokenManager" inject="TokenManager@cf-token-manager";
-	property name="settings"     inject="coldbox:moduleSettings:cf-token-manager";
-
-	/**
-	 * Hardcoded demo users (no database).
-	 */
-	variables.users = {
-		"test" : "test",
-		"user" : "pass"
-	};
+	property name="settings" inject="coldbox:moduleSettings:cf-token-manager";
+	property name="authService" inject="AuthService";
 
 	function index( event, rc, prc ){
-		relocate( "security.login" );
+		relocate( URI = isLoggedIn() ? "/dashboard" : "/login" );
 	}
 
-	/**
-	 * Login screen.
-	 */
 	function login( event, rc, prc ){
 		if ( isLoggedIn() ) {
-			relocate( "security.dashboard" );
+			relocate( URI = "/dashboard" );
 			return;
 		}
 		prc.pageTitle = "Sign in";
-		event.setLayout( "Simple" );
+		event.setLayout( "Auth" );
 		event.setView( "security/login" );
 	}
 
-	/**
-	 * Validate credentials and, on success, ISSUE the first token pair.
-	 */
 	function doLogin( event, rc, prc ){
+		if ( compareNoCase( cgi.request_method ?: "GET", "POST" ) != 0 ) {
+			event.setHTTPHeader( name = "Allow", value = "POST" );
+			return event.renderData(
+				type       = "html",
+				statusCode = 405,
+				data       = "<h1>Method not allowed</h1><p>Sign in using the login form.</p>"
+			);
+		}
 		param rc.username = "";
 		param rc.password = "";
+		var authentication = authService.authenticate( rc.username, rc.password );
 
-		var username = trim( rc.username );
-
-		if ( variables.users.keyExists( username ) && variables.users[ username ] == rc.password ) {
+		if ( authentication.authenticated ) {
+			var account = authentication.user;
 			lock scope="session" type="exclusive" timeout="5" {
-				session.user   = username;
-				// issue() -> the first access + refresh token pair for this session
-				session.tokens = tokenManager.issue( { id : username, role : "customer", email : "test@test.com" });
+				session.user      = account;
+				session.tokens    = tokenManager.issue( { id : account.id, role : account.role, email : account.email } );
+				session.csrfToken = hash( createUUID() & getTickCount(), "SHA-256" );
 			}
-			relocate( "security.dashboard" );
+			relocate( URI = "/dashboard" );
 			return;
 		}
 
-		relocate(
-			event         = "security.login",
-			persistStruct = { "error" : "Invalid username or password. Please try again." }
-		);
+		relocate( URI = "/login", persistStruct = { error : "That email or password is not correct." } );
 	}
 
-	/**
-	 * The protected dashboard — visible only while a valid session exists.
-	 * Renders the live token console (countdowns + activity log run client-side).
-	 */
 	function dashboard( event, rc, prc ){
-		if ( !isLoggedIn() ) {
-			relocate( event = "security.login", persistStruct = { "error" : "Please log in to continue." } );
-			return;
-		}
-
-		var now = nowEpoch();
-
-		prc.username      = session.user;
-		prc.tokens        = session.tokens;
-		prc.accessClaims  = tokenManager.decode( session.tokens.accessToken );
-		prc.refreshClaims = tokenManager.decode( session.tokens.refreshToken );
-
-		prc.accessTTL   = int( settings.accessTokenExpiry );
-		prc.refreshTTL  = int( settings.refreshTokenExpiry );
-		prc.accessIn    = prc.accessClaims.exp - now;   // seconds until access expires
-		prc.refreshIn   = prc.refreshClaims.exp - now;  // seconds until refresh expires
-
-		prc.pageTitle = "Dashboard";
-		event.setLayout( "Simple" );
-		event.setView( "security/dashboard" );
+		relocate( URI = "/dashboard" );
 	}
 
-	/**
-	 * JSON endpoint called by the dashboard when the access token expires.
-	 * Uses refresh() to mint a new access token. If the refresh token itself
-	 * is expired/invalid, the session is killed and the client is told to log out.
-	 */
 	function refreshToken( event, rc, prc ){
 		if ( !isLoggedIn() ) {
-			return event.renderData( type = "json", data = { "ok" : false, "reason" : "NOT_LOGGED_IN" } );
+			return event.renderData( type = "json", data = { ok : false, reason : "NOT_LOGGED_IN" } );
 		}
-
-		// Is the refresh token still good? diagnose() tells us exactly.
-		var diag = tokenManager.diagnose( session.tokens.refreshToken, "refresh" );
-		if ( !diag.valid ) {
+		var diagnosis = tokenManager.diagnose( session.tokens.refreshToken, "refresh" );
+		if ( !diagnosis.valid ) {
 			killSession();
-			return event.renderData( type = "json", data = { "ok" : false, "reason" : diag.code, "message" : diag.message } );
+			return event.renderData( type = "json", data = { ok : false, reason : diagnosis.code, message : diagnosis.message } );
 		}
-
 		var result = tokenManager.refresh( session.tokens.refreshToken );
 		lock scope="session" type="exclusive" timeout="5" {
 			session.tokens.accessToken = result.accessToken;
 		}
-
-		var now           = nowEpoch();
 		var accessClaims  = tokenManager.decode( result.accessToken );
 		var refreshClaims = tokenManager.decode( session.tokens.refreshToken );
-
 		return event.renderData( type = "json", data = {
-			"ok"          : true,
-			"accessToken" : result.accessToken,
-			"accessIn"    : accessClaims.exp - now,
-			"refreshIn"   : refreshClaims.exp - now
+			ok          : true,
+			accessToken : result.accessToken,
+			accessIn    : accessClaims.exp - nowEpoch(),
+			refreshIn   : refreshClaims.exp - nowEpoch()
 		} );
 	}
 
 	function logout( event, rc, prc ){
+		if ( compareNoCase( cgi.request_method ?: "GET", "POST" ) != 0 ) {
+			event.setHTTPHeader( name = "Allow", value = "POST" );
+			return event.renderData(
+				type       = "html",
+				statusCode = 405,
+				data       = "<h1>Method not allowed</h1><p>Sign out from the workspace menu.</p>"
+			);
+		}
+		param rc.csrfToken = "";
+		if ( !isLoggedIn() || !structKeyExists( session, "csrfToken" ) || rc.csrfToken != session.csrfToken ) {
+			return event.renderData(
+				type       = "html",
+				statusCode = 403,
+				data       = "<h1>Request expired</h1><p>Refresh the workspace and try again.</p>"
+			);
+		}
 		killSession();
-		relocate( event = "security.login", persistStruct = { "error" : "You have been logged out." } );
+		relocate( URI = "/login", persistStruct = { notice : "You have been signed out safely." } );
 	}
 
-	/* --------------------------------------------------------------------- */
-	/* Internals                                                             */
-	/* --------------------------------------------------------------------- */
-
 	private boolean function isLoggedIn(){
-		return structKeyExists( session, "user" )
-			&& len( session.user )
-			&& structKeyExists( session, "tokens" );
+		return structKeyExists( session, "user" ) && isStruct( session.user ) && structKeyExists( session, "tokens" );
 	}
 
 	private void function killSession(){
 		lock scope="session" type="exclusive" timeout="5" {
 			structDelete( session, "user" );
 			structDelete( session, "tokens" );
+			structDelete( session, "csrfToken" );
 		}
 	}
 

@@ -1,10 +1,10 @@
 {
-    "name":"blog",
+    "name":"duepilot",
     "version":"1.0.0",
-    "author":"You",
-    "shortDescription":"A modern ColdBox CFML application template with best practices and tools integrated.",
+    "author":"DuePilot",
+    "shortDescription":"A receivables command center for invoice follow-up, payment promises and collections.",
     "location":"forgeboxStorage",
-    "slug":"blog",
+    "slug":"duepilot",
     "createPackageDirectory":false,
     "type":"mvc",
     "keywords":[],
@@ -44,5 +44,5 @@
         "runner":"/tests/runner.cfm"
     },
     "language":"CFML",
-    "description":"A ColdBox Application created with the ColdBox CLI"
+    "description":"DuePilot helps service businesses collect invoices faster and forecast incoming cash."
 }

@@ -26,6 +26,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [refreshingSession, setRefreshingSession] = useState(false);
+  const [sessionMessage, setSessionMessage] = useState("");
 
   useEffect(() => {
     const savedTheme = localStorage.getItem("duepilot-theme") === "dark" ? "dark" : "light";
@@ -49,6 +51,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     await apiMutation<{ signedOut: boolean }>("/auth/logout", {});
     router.replace("/login");
     router.refresh();
+  }
+
+  async function refreshSession() {
+    setRefreshingSession(true);
+    setSessionMessage("");
+    const result = await apiRequest<{ refreshed: boolean; accessIn: number; refreshIn: number }>("/auth/refresh", { method: "POST" });
+    if (result.ok) {
+      setSessionMessage("Session refreshed");
+    } else if (result.error.code === "AUTHENTICATION_REQUIRED") {
+      router.replace("/login");
+    } else {
+      setSessionMessage(result.error.message);
+    }
+    setRefreshingSession(false);
   }
 
   const isActive = (href: string) => pathname === href || (href !== "/app/dashboard" && pathname.startsWith(`${href}/`));
@@ -80,7 +96,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <header className="app-topbar">
         <button className="mobile-menu" aria-label="Open navigation" aria-expanded={sidebarOpen} onClick={() => setSidebarOpen(true)}><ProductIcon name="menu" /> Menu</button>
         <label className="global-search"><ProductIcon name="search" /><input aria-label="Search workspace" placeholder="Search invoices, customers…" onKeyDown={(event) => { if (event.key === "Enter") { const value = event.currentTarget.value.trim(); router.push(value ? `/app/invoices?search=${encodeURIComponent(value)}` : "/app/invoices"); } }} /><kbd>⌘ K</kbd></label>
-        <div className="topbar-actions"><span className="sync-state"><i /> Live workspace</span><ThemeToggle /><button className="ai-button" onClick={() => setAssistantOpen(true)}><ProductIcon name="sparkle" /> Ask DuePilot</button></div>
+        <div className="topbar-actions"><span className="sync-state"><i /> <span>Session protected</span></span><button className="session-refresh" onClick={refreshSession} disabled={refreshingSession} title="Refresh the secure session"><span aria-hidden="true">↻</span><span>{refreshingSession ? "Refreshing" : "Refresh session"}</span></button>{sessionMessage && <span className="session-message" role="status">{sessionMessage}</span>}<ThemeToggle /><button className="ai-button" onClick={() => setAssistantOpen(true)}><ProductIcon name="sparkle" /> Ask DuePilot</button></div>
       </header>
       {children}
     </section>

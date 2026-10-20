@@ -27,6 +27,20 @@ export type Invoice = {
 };
 export type Customer = { id: string; name: string; contact: string; email: string; phone: string; initials: string; outstanding: number; overdue: number; paid: number; invoiceCount: number; health: string };
 export type Session = { user: User; workspace: Workspace; csrfToken: string };
+export type AccessPolicy = {
+  verified: boolean;
+  role: string;
+  roles: string[];
+  checks: {
+    ownRole: boolean;
+    operations: boolean;
+    collections: boolean;
+    workspaceAdmin: boolean;
+    platformAdmin: boolean;
+    platformOwner: boolean;
+  };
+  platform: { valid: boolean; authorized: boolean; code: string };
+};
 export type Dashboard = {
   organization: Workspace;
   outstanding: number;

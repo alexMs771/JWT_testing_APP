@@ -20,3 +20,4 @@
   .landing-theme-toggle { width:36px; min-width:36px; height:36px; padding:3px; }
   .landing-theme-toggle .theme-switch-icon { width:25px; height:25px; flex-basis:25px; }
 }
+.landing-proof::after { display:inline-flex; align-items:center; padding:7px 10px; border:1px solid color-mix(in srgb,var(--l-teal) 25%,var(--l-line)); border-radius:999px; color:var(--l-muted); background:color-mix(in srgb,var(--l-surface) 76%,transparent); content:"Signed sessions · Role-aware access · Clear 401 / 403"; font-size:10px; font-weight:800; }

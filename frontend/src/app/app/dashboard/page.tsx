@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ProductIcon } from "@/components/product-icon";
 import { apiRequest } from "@/lib/api";
-import type { Dashboard, WorkspaceContext } from "@/types/api";
+import type { AccessPolicy, Dashboard, WorkspaceContext } from "@/types/api";
 
 const money = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 });
 
@@ -17,11 +17,12 @@ export default function DashboardPage() {
   const router = useRouter();
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
   const [context, setContext] = useState<WorkspaceContext | null>(null);
+  const [accessPolicy, setAccessPolicy] = useState<AccessPolicy | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
     let active = true;
-    Promise.all([apiRequest<Dashboard>("/dashboard"), apiRequest<WorkspaceContext>("/workspace/context")]).then(([result, contextResult]) => {
+    Promise.all([apiRequest<Dashboard>("/dashboard"), apiRequest<WorkspaceContext>("/workspace/context"), apiRequest<AccessPolicy>("/auth/permissions")]).then(([result, contextResult, policyResult]) => {
       if (!active) return;
       if (!result.ok) {
         if (result.error.code === "AUTHENTICATION_REQUIRED") router.replace("/login");
@@ -30,6 +31,7 @@ export default function DashboardPage() {
       }
       setDashboard(result.data);
       if (contextResult.ok) setContext(contextResult.data);
+      if (policyResult.ok) setAccessPolicy(policyResult.data);
     });
     return () => { active = false; };
   }, [router]);
@@ -57,6 +59,8 @@ export default function DashboardPage() {
       <section className="panel collection-queue"><header><div><span className="section-kicker">Focus list</span><h2>Collection queue</h2><p>The balances most worth moving today.</p></div><Link href="/app/collections">Open queue <ProductIcon name="arrow" /></Link></header><div className="queue-table"><div className="table-head"><span>Priority</span><span>Customer & invoice</span><span>Recommended focus</span><span>Open balance</span></div>{dashboard.priorityInvoices.map((invoice, index) => <Link href={`/app/invoices/${invoice.id}`} className="table-row" key={invoice.id}><span className={`priority-number ${index < 2 ? "high" : "normal"}`}>{String(index + 1).padStart(2, "0")}</span><span><b>{invoice.customerName}</b><small>{invoice.invoiceNumber} · due {invoice.dueDate}</small></span><span><em className={`status ${invoice.status}`}>{invoice.status.replace(/_/g, " ")}</em><small>{invoice.daysOverdue > 0 ? `${invoice.daysOverdue} days overdue` : `Due in ${invoice.daysUntilDue} days`}</small></span><strong>{money.format(invoice.outstanding)}<ProductIcon name="arrow" /></strong></Link>)}</div></section>
 
       <section className="panel attention-card"><header><div><span className="section-kicker">Risk lens</span><h2>Open-balance health</h2></div><Link href="/app/reports" aria-label="Open reports"><ProductIcon name="arrow" /></Link></header><div className="risk-score"><div><strong>{openRisk}%</strong><span>of open receivables are overdue</span></div><i><b style={{ width: `${Math.max(openRisk, 3)}%` }} /></i></div><div className="aging-list">{[["Current", dashboard.aging.current, "current"], ["1–30 days", dashboard.aging.oneToThirty, "one"], ["31–60 days", dashboard.aging.thirtyOneToSixty, "two"], ["60+ days", dashboard.aging.overSixty, "three"]].map(([label, value, tone]) => <span key={label as string}><i className={tone as string} /><b>{label}</b><em>{money.format(value as number)}</em></span>)}</div></section>
+
+      {accessPolicy && <section className="panel access-panel"><header><div><span className="section-kicker">Security posture</span><h2>Access, explained</h2></div><span className="access-verified"><i /> Verified</span></header><div className="access-identity"><span className="access-avatar">{dashboard.organization.initials}</span><div><b>{accessPolicy.role || "workspace member"}</b><small>{accessPolicy.roles.join(" · ")}</small></div></div><div className="access-checks"><span><i className={accessPolicy.checks.operations ? "pass" : "blocked"} /> Operations access</span><span><i className={accessPolicy.checks.collections ? "pass" : "blocked"} /> Collections access</span><span><i className={accessPolicy.checks.workspaceAdmin ? "pass" : "blocked"} /> Workspace admin</span><span><i className={accessPolicy.checks.platformAdmin ? "pass" : "blocked"} /> Platform admin</span></div><p className="access-footnote">Signed access token · {accessPolicy.platform.code === "AUTHORIZED" ? "platform authorization granted" : "least-privilege access enforced"}</p></section>}
 
       <section className="panel forecast-panel"><header><div><span className="section-kicker">Expected cash</span><h2>Forecast confidence</h2><p>Expected payment timing from current invoice activity.</p></div></header><div className="forecast-list">{dashboard.forecast.map((item) => <div key={item.label}><span><b>{item.label}</b><small>{item.confidence}% confidence</small></span><strong>{money.format(item.amount)}</strong><i><b style={{ width: `${item.confidence}%` }} /></i></div>)}</div></section>
 

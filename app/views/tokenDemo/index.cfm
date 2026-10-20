@@ -21,9 +21,10 @@
 	}
 	function claimRow( required string name, required any value ){
 		var isTime = listFindNoCase( "iat,exp", arguments.name );
+		var safeValue = isSimpleValue( arguments.value ) ? toString( arguments.value ) : serializeJSON( arguments.value );
 		var display = isTime
 			? fmtEpoch( arguments.value ) & ' <span class="text-muted">(' & arguments.value & ')</span>'
-			: encodeForHTML( arguments.value );
+			: encodeForHTML( safeValue );
 		return '<tr><td class="text-muted" style="width:32%;">' & encodeForHTML( arguments.name ) & '</td><td class="font-monospace small">' & display & '</td></tr>';
 	}
 </cfscript>

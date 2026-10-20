@@ -15,7 +15,8 @@
     "ignore":[],
     "dependencies":{
         "coldbox":"^8.0.0",
-        "cf-token-manager":"github:alexMs771/cf-token-manager"
+        "cf-token-manager":"github:alexMs771/cf-token-manager",
+        "jwt":"^1.1.0"
     },
     "devDependencies":{
         "testbox":"*",
@@ -27,7 +28,8 @@
         "coldbox":"lib/coldbox/",
         "testbox":"lib/testbox/",
         "route-visualizer":"lib/modules/route-visualizer/",
-        "cf-token-manager":"lib/modules/cf-token-manager/"
+        "cf-token-manager":"lib/modules/cf-token-manager/",
+        "jwt":"lib/modules/jwt/"
     },
     "installPathConventions":{
         "modules":"lib/modules"

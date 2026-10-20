@@ -235,6 +235,23 @@ component extends="coldbox.system.EventHandler" {
 			tokenManager.verify( tampered, "access" ) == false
 		) );
 
+		// validate() is the strict, exception-oriented counterpart to diagnose().
+		var validatedClaims = {};
+		var validateOk      = false;
+		try {
+			validatedClaims = tokenManager.validate( validAccess, "access" );
+			validateOk      = ( validatedClaims.sub ?: "" ) == "matrix-user";
+		} catch ( any e ) {
+			validatedClaims = { error : e.type };
+		}
+		rows.append( row(
+			"validate()", "Return trusted claims for a valid token",
+			"valid access token",
+			"trusted claims with sub = matrix-user",
+			"sub = #( validatedClaims.sub ?: validatedClaims.error ?: "?" )#",
+			validateOk
+		) );
+
 		// ---- validate()/diagnose() dimensions ----
 		rows.append( diagRow( "diagnose()", "Valid token",              validAccess,   "access",  "VALID" ) );
 		rows.append( diagRow( "diagnose()", "Tampered signature",       tampered,      "access",  "INVALID_SIGNATURE" ) );
@@ -276,6 +293,56 @@ component extends="coldbox.system.EventHandler" {
 			"throws InvalidTokenType",
 			refreshRejCode,
 			refreshRejected
+		) );
+
+		// ---- RBAC ----
+		var rbacPair = tokenManager.issue({
+			id    : "rbac-user",
+			roles : [ "admin", "finance" ]
+		});
+		var rbacDenied = tokenManager.diagnoseAuthorization( rbacPair.accessToken, "manager" );
+		rows.append( row(
+			"hasRole()", "Matching role is accepted",
+			"roles = [admin, finance], required = admin",
+			"true",
+			tokenManager.hasRole( rbacPair.accessToken, "admin" ) ? "true" : "false",
+			tokenManager.hasRole( rbacPair.accessToken, "admin" )
+		) );
+		rows.append( row(
+			"hasAnyRole()", "At least one matching role is accepted",
+			"roles = [admin, finance], required = [manager, finance]",
+			"true",
+			tokenManager.hasAnyRole( rbacPair.accessToken, [ "manager", "finance" ] ) ? "true" : "false",
+			tokenManager.hasAnyRole( rbacPair.accessToken, [ "manager", "finance" ] )
+		) );
+		rows.append( row(
+			"hasAllRoles()", "All required roles are present",
+			"roles = [admin, finance], required = [admin, finance]",
+			"true",
+			tokenManager.hasAllRoles( rbacPair.accessToken, [ "admin", "finance" ] ) ? "true" : "false",
+			tokenManager.hasAllRoles( rbacPair.accessToken, [ "admin", "finance" ] )
+		) );
+		rows.append( row(
+			"diagnoseAuthorization()", "Valid token without required role",
+			"roles = [admin, finance], required = manager",
+			"INSUFFICIENT_ROLE",
+			rbacDenied.code,
+			rbacDenied.valid && !rbacDenied.authorized && rbacDenied.code == "INSUFFICIENT_ROLE"
+		) );
+		var authorizedClaims = {};
+		var authorizeOk      = false;
+		try {
+			authorizedClaims = tokenManager.authorize( rbacPair.accessToken, "admin" );
+			authorizeOk      = ( authorizedClaims.sub ?: "" ) == "rbac-user";
+		} catch ( any e ) {
+			authorizedClaims = { error : e.type };
+		}
+		rows.append( row(
+			"authorize()", "Return trusted claims when the role is present",
+			"roles = [admin, finance], required = admin",
+			"trusted claims with sub = rbac-user",
+			"sub = #( authorizedClaims.sub ?: authorizedClaims.error ?: "?" )#",
+			authorizeOk
 		) );
 
 		return rows;

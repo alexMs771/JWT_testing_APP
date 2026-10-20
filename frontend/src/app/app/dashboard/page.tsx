@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ProductIcon } from "@/components/product-icon";
 import { apiRequest } from "@/lib/api";
-import type { Dashboard } from "@/types/api";
+import type { Dashboard, WorkspaceContext } from "@/types/api";
 
 const money = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 });
 
@@ -16,11 +16,12 @@ function DashboardSkeleton() {
 export default function DashboardPage() {
   const router = useRouter();
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
+  const [context, setContext] = useState<WorkspaceContext | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
     let active = true;
-    apiRequest<Dashboard>("/dashboard").then((result) => {
+    Promise.all([apiRequest<Dashboard>("/dashboard"), apiRequest<WorkspaceContext>("/workspace/context")]).then(([result, contextResult]) => {
       if (!active) return;
       if (!result.ok) {
         if (result.error.code === "AUTHENTICATION_REQUIRED") router.replace("/login");
@@ -28,6 +29,7 @@ export default function DashboardPage() {
         return;
       }
       setDashboard(result.data);
+      if (contextResult.ok) setContext(contextResult.data);
     });
     return () => { active = false; };
   }, [router]);
@@ -45,7 +47,7 @@ export default function DashboardPage() {
   const openRisk = dashboard.outstanding ? Math.round((dashboard.overdueAmount / dashboard.outstanding) * 100) : 0;
 
   return <main className="product-page">
-    <div className="page-heading dashboard-heading"><div><span className="page-eyebrow">Receivables command center</span><h1>A clear view of your cash.</h1><p>{dashboard.organization.name} has <strong>{dashboard.priorityInvoices.length} priority actions</strong> ready for your team today.</p></div><div className="heading-actions"><span className="live-context"><i /> All activity is live</span><Link className="button button-primary" href="/app/invoices">Create invoice <ProductIcon name="arrow" /></Link></div></div>
+    <div className="page-heading dashboard-heading"><div><span className="page-eyebrow">{context?.sector.recordLabel || "Receivables"} command center</span><h1>A clear view of your cash.</h1><p>{dashboard.organization.name} has <strong>{dashboard.priorityInvoices.length} priority actions</strong> ready today. {context?.sector.description}</p></div><div className="heading-actions"><span className="live-context"><i /> {context?.sector.partyLabel || "Customer"} workflow live</span><Link className="button button-primary" href="/app/invoices">Create {context?.sector.recordLabel || "invoice"} <ProductIcon name="arrow" /></Link></div></div>
 
     <section className="metric-grid" aria-label="Key receivables metrics">
       {metrics.map(([label, value, detail, tone]) => <article className={`metric-card ${tone}`} key={label}><div><span>{label}</span><i><ProductIcon name={tone === "green" ? "check" : tone === "rose" ? "collections" : "arrow"} /></i></div><strong>{money.format(value)}</strong><p>{detail}</p></article>)}

@@ -4,7 +4,8 @@ export type ApiFailure = { ok: false; error: { code: string; message: string; de
 export type ApiResponse<T> = ApiSuccess<T> | ApiFailure;
 
 export type User = { id: string; name: string; email: string; role: string; initials: string; isPlatformAdmin?: boolean };
-export type Workspace = { id: string; name: string; initials: string; plan: string; currency: string };
+export type Workspace = { id: string; name: string; initials: string; plan: string; organizationType?: string; currency: string };
+export type WorkspaceContext = { organization: Workspace; sector: { partyLabel: string; recordLabel: string; paymentLabel: string; description: string }; capabilities: string[]; rules: { currencyLockedAfterFirstInvoice: boolean; paymentCannotExceedBalance: boolean; tenantScoped: boolean } };
 export type Invoice = {
   id: string;
   invoiceNumber: string;

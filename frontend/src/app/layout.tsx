@@ -6,6 +6,11 @@ import "./landing.css";
 export const metadata: Metadata = {
   title: { default: "DuePilot - Payment operations, under control", template: "%s | DuePilot" },
   description: "A multi-organization platform for billing, payments, collections and financial clarity.",
+  icons: {
+    icon: [{ url: "/duepilot-logo.svg", type: "image/svg+xml" }],
+    shortcut: [{ url: "/duepilot-logo.svg", type: "image/svg+xml" }],
+    apple: [{ url: "/duepilot-logo.svg", type: "image/svg+xml" }],
+  },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

@@ -278,6 +278,34 @@ component extends="coldbox.system.EventHandler" {
 			refreshRejected
 		) );
 
+		// ---- RBAC ----
+		var rbacPair = tokenManager.issue({
+			id    : "rbac-user",
+			roles : [ "admin", "finance" ]
+		});
+		var rbacDenied = tokenManager.diagnoseAuthorization( rbacPair.accessToken, "manager" );
+		rows.append( row(
+			"hasRole()", "Matching role is accepted",
+			"roles = [admin, finance], required = admin",
+			"true",
+			tokenManager.hasRole( rbacPair.accessToken, "admin" ) ? "true" : "false",
+			tokenManager.hasRole( rbacPair.accessToken, "admin" )
+		) );
+		rows.append( row(
+			"hasAllRoles()", "All required roles are present",
+			"roles = [admin, finance], required = [admin, finance]",
+			"true",
+			tokenManager.hasAllRoles( rbacPair.accessToken, [ "admin", "finance" ] ) ? "true" : "false",
+			tokenManager.hasAllRoles( rbacPair.accessToken, [ "admin", "finance" ] )
+		) );
+		rows.append( row(
+			"diagnoseAuthorization()", "Valid token without required role",
+			"roles = [admin, finance], required = manager",
+			"INSUFFICIENT_ROLE",
+			rbacDenied.code,
+			rbacDenied.valid && !rbacDenied.authorized && rbacDenied.code == "INSUFFICIENT_ROLE"
+		) );
+
 		return rows;
 	}
 

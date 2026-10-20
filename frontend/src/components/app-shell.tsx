@@ -73,6 +73,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {navigation.slice(4).map(([href, label, icon]) => <Link key={href} href={href} onClick={() => setSidebarOpen(false)} className={isActive(href) ? "active" : ""}><ProductIcon name={icon} /><span>{label}</span></Link>)}
         <Link href="/app/settings" onClick={() => setSidebarOpen(false)} className={isActive("/app/settings") ? "active" : ""}><ProductIcon name="settings" /><span>Settings</span></Link>
       </nav>
+      <Link href="/" className="sidebar-public-link"><span aria-hidden="true">←</span> Back to public site</Link>
       <div className="sidebar-user"><span>{session.user.initials}</span><div><strong>{session.user.name}</strong><small>{session.user.role}</small></div><button onClick={logout} aria-label="Sign out of DuePilot">Sign out</button></div>
     </aside>
     <section className="app-main">

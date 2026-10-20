@@ -3,7 +3,7 @@ component singleton {
 
 	private query function run( required string sql, struct params = {} ){
 		for ( var paramName in arguments.params ) {
-			if ( listFindNoCase( "workspaceId,customerId,invoiceId,actor", toString( paramName ) ) ) {
+			if ( listFindNoCase( "workspaceId,userId,customerId,invoiceId,actor", toString( paramName ) ) ) {
 				arguments.params[ paramName ].sqltype = "other";
 			}
 		}
@@ -19,10 +19,61 @@ component singleton {
 	}
 
 	public struct function getOrganization(){
-		var result = run( "SELECT id, name, currency, finance_email, default_payment_terms FROM workspaces WHERE id=:workspaceId", pWorkspace() );
+		var result = run( "SELECT id, name, organization_type, currency, finance_email, default_payment_terms FROM workspaces WHERE id=:workspaceId", pWorkspace() );
 		if ( !result.recordCount ) throw( type="DuePilot.WorkspaceNotFound", message="Workspace not found." );
 		var workspaceName=textValue(result.name[1]);
-		return { id:toString(result.id[1]), name:workspaceName, initials:initials(workspaceName), plan:"Growth", currency:textValue(result.currency[1]), financeEmail:textValue(result.finance_email[1]), defaultTerms:result.default_payment_terms[1] };
+		return { id:toString(result.id[1]), name:workspaceName, initials:initials(workspaceName), plan:"Growth", organizationType:textValue(result.organization_type[1]), currency:textValue(result.currency[1]), financeEmail:textValue(result.finance_email[1]), defaultTerms:result.default_payment_terms[1] };
+	}
+
+	public struct function getWorkspaceContext(){
+		var organization = getOrganization();
+		var profiles = {
+			business: {partyLabel:"Customer", recordLabel:"Invoice", paymentLabel:"Payment", description:"Client work and commercial receivables."},
+			school: {partyLabel:"Family", recordLabel:"Fee assessment", paymentLabel:"Fee payment", description:"Student fees, transport, activities, and family balances."},
+			college: {partyLabel:"Student", recordLabel:"Fee assessment", paymentLabel:"Fee payment", description:"Student billing, installments, hostels, and academic services."},
+			coaching: {partyLabel:"Learner", recordLabel:"Fee plan", paymentLabel:"Fee payment", description:"Course fees, batches, and installment collections."},
+			property: {partyLabel:"Tenant", recordLabel:"Rent demand", paymentLabel:"Rent payment", description:"Rent, maintenance, deposits, and property charges."},
+			utility: {partyLabel:"Account holder", recordLabel:"Bill", paymentLabel:"Bill payment", description:"Recurring utility bills and service accounts."},
+			subscription: {partyLabel:"Subscriber", recordLabel:"Subscription invoice", paymentLabel:"Subscription payment", description:"Recurring plans, renewals, and failed-payment recovery."},
+			healthcare: {partyLabel:"Patient", recordLabel:"Care invoice", paymentLabel:"Patient payment", description:"Patient billing and service balances."},
+			other: {partyLabel:"Account", recordLabel:"Invoice", paymentLabel:"Payment", description:"Flexible receivables for any operating model."}
+		};
+		var type = structKeyExists(profiles, organization.organizationType) ? organization.organizationType : "other";
+		return { organization:organization, sector:profiles[type], capabilities:["customers","invoices","payments","collections","reports","assistant"], rules:{currencyLockedAfterFirstInvoice:true, paymentCannotExceedBalance:true, tenantScoped:true} };
+	}
+
+	public struct function getPersonalSummary(){
+		var userId = personalUserId();
+		var profileResult = run("SELECT display_name,mobile_e164,mobile_verified_at FROM personal_profiles WHERE user_id=:userId",{userId:{value:userId,sqltype:"varchar"}});
+		var connectionResult = run("SELECT id,provider_name,category,status,last_synced_at FROM personal_connections WHERE user_id=:userId ORDER BY provider_name",{userId:{value:userId,sqltype:"varchar"}});
+		var obligationResult = run("SELECT id,provider_name,category,title,external_reference,amount,paid_amount,currency,issue_date,due_date,status FROM personal_obligations WHERE user_id=:userId AND status<>'cancelled' ORDER BY due_date,provider_name",{userId:{value:userId,sqltype:"varchar"}});
+		var obligations=[]; var totalOpen=0; var overdueAmount=0; var dueSoonAmount=0; var paidAmount=0; var overdueCount=0;
+		for(var row in obligationResult){
+			var balance=max(0,row.amount-row.paid_amount); var days=dateDiff("d",now(),row.due_date); var derivedStatus=lCase(toString(row.status));
+			if(derivedStatus!="paid"&&balance<=0) derivedStatus="paid";
+			else if(derivedStatus!="paid"&&days<0) derivedStatus="overdue";
+			else if(derivedStatus!="paid"&&row.paid_amount>0) derivedStatus="partial";
+			if(balance>0){totalOpen+=balance;if(days<0){overdueAmount+=balance;overdueCount++;}else if(days<=7)dueSoonAmount+=balance;}
+			paidAmount+=row.paid_amount;
+			obligations.append({id:toString(row.id),providerName:toString(row.provider_name),category:toString(row.category),title:toString(row.title),externalReference:toString(row.external_reference),amount:row.amount,paidAmount:row.paid_amount,balance:balance,currency:toString(row.currency),issueDate:row.issue_date?dateFormat(row.issue_date,"yyyy-mm-dd"):"",dueDate:dateFormat(row.due_date,"yyyy-mm-dd"),status:derivedStatus,daysUntilDue:days,daysOverdue:days<0?abs(days):0});
+		}
+		var connections=[]; for(var connection in connectionResult) connections.append({id:toString(connection.id),providerName:toString(connection.provider_name),category:toString(connection.category),status:toString(connection.status),lastSyncedAt:connection.last_synced_at?dateTimeFormat(connection.last_synced_at,"yyyy-mm-dd HH:nn"):""});
+		var profile={displayName:"",mobileLast4:"",mobileVerified:false};
+		if(profileResult.recordCount){profile.displayName=textValue(profileResult.display_name[1]);var mobile=textValue(profileResult.mobile_e164[1]);profile.mobileLast4=len(mobile)>=4?right(mobile,4):"";profile.mobileVerified=!isNull(profileResult.mobile_verified_at[1]);}
+		return {profile:profile,connections:connections,obligations:obligations,summary:{totalOpen:totalOpen,overdueAmount:overdueAmount,overdueCount:overdueCount,dueSoonAmount:dueSoonAmount,paidAmount:paidAmount}};
+	}
+
+	public struct function createCustomer(required string name, string contactName="", string email="", string phone="", string externalReference=""){
+		var cleanName = trim(reReplace(arguments.name,"\\s+"," ","all"));
+		var cleanEmail = lCase(trim(arguments.email));
+		if(len(cleanName)<2 || len(cleanName)>160) throw(type="DuePilot.InvalidCustomer",message="Account name must be between 2 and 160 characters.");
+		if(len(cleanEmail) && !isValid("email",cleanEmail)) throw(type="DuePilot.InvalidCustomer",message="Enter a valid account email address.");
+		var workspace = workspaceId();
+		var existing = run("SELECT id FROM customers WHERE workspace_id=:workspaceId AND lower(display_name)=lower(:name) LIMIT 1",{workspaceId:{value:workspace,sqltype:"varchar"},name:{value:cleanName,sqltype:"varchar"}});
+		if(existing.recordCount) throw(type="DuePilot.DuplicateCustomer",message="An account with this name already exists in this workspace.");
+		var created = run("INSERT INTO customers(workspace_id,display_name,contact_name,email,phone,external_reference,default_payment_terms) SELECT :workspaceId,:name,:contact,:email,:phone,:external,:terms FROM workspaces WHERE id=:workspaceId RETURNING id",{workspaceId:{value:workspace,sqltype:"varchar"},name:{value:cleanName,sqltype:"varchar"},contact:{value:trim(arguments.contactName),sqltype:"varchar"},email:{value:cleanEmail,sqltype:"varchar",null:!len(cleanEmail)},phone:{value:trim(arguments.phone),sqltype:"varchar"},external:{value:trim(arguments.externalReference),sqltype:"varchar",null:!len(trim(arguments.externalReference))},terms:{value:getOrganization().defaultTerms,sqltype:"integer"}});
+		if(!created.recordCount) throw(type="DuePilot.CustomerCreateFailed",message="The account could not be created.");
+		return getCustomer(toString(created.id[1]));
 	}
 
 	public struct function updateOrganization( required string name, required string currency, required string financeEmail, required numeric defaultTerms ){
@@ -127,6 +178,7 @@ component singleton {
 	private void function assertOpen(required string invoiceId){var result=run("SELECT balance_amount FROM invoices WHERE id=:invoiceId AND workspace_id=:workspaceId",invoiceParams(arguments.invoiceId));if(!result.recordCount)throw(type="DuePilot.InvoiceNotFound",message="Invoice not found.");if(result.balance_amount[1]<=0)throw(type="DuePilot.AlreadyPaid",message="This invoice is already fully paid.");}
 	private void function activity(required string invoiceId,required string kind,required string summary,struct detail={}){run("INSERT INTO collection_activities(workspace_id,invoice_id,activity_type,channel,summary,detail,created_by) VALUES(:workspaceId,:invoiceId,:kind,:channel,:summary,cast(:detail as jsonb),:actor)",{workspaceId:{value:workspaceId(),sqltype:"varchar"},invoiceId:{value:arguments.invoiceId,sqltype:"varchar"},kind:{value:arguments.kind,sqltype:"varchar"},channel:{value:arguments.detail.channel?:"",sqltype:"varchar",null:!structKeyExists(arguments.detail,"channel")},summary:{value:arguments.summary,sqltype:"varchar"},detail:{value:serializeJSON(arguments.detail),sqltype:"varchar"},actor:{value:actorId(),sqltype:"varchar"}});}
 	private string function actorId(){if(structKeyExists(session,"user")&&structKeyExists(session.user,"id")&&isValid("uuid",session.user.id))return session.user.id;var result=run("SELECT user_id FROM workspace_members WHERE workspace_id=:workspaceId AND status='active' ORDER BY joined_at LIMIT 1",pWorkspace());if(!result.recordCount)throw(type="DuePilot.ActorNotFound",message="No active workspace member is available.");return toString(result.user_id[1]);}
+	private string function personalUserId(){if(structKeyExists(session,"user")&&structKeyExists(session.user,"id")&&isValid("uuid",session.user.id))return session.user.id;throw(type="DuePilot.PersonalAuthenticationRequired",message="Sign in to view personal obligations.");}
 	private struct function pWorkspace(){return {workspaceId:{value:workspaceId(),sqltype:"varchar"}};}
 	private struct function invoiceParams(required string invoiceId){return {workspaceId:{value:workspaceId(),sqltype:"varchar"},invoiceId:{value:arguments.invoiceId,sqltype:"varchar"}};}
 	private string function initials(required string value){var parts=listToArray(trim(arguments.value)," ");return uCase(left(parts[1],1)&(parts.len()>1?left(parts[parts.len()],1):""));}

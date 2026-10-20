@@ -43,6 +43,22 @@ component singleton {
 		return duplicate( variables.store.organization );
 	}
 
+	public struct function getWorkspaceContext(){
+		if ( isPostgresMode() ) return postgresRepository.getWorkspaceContext();
+		var organization = getOrganization();
+		return { organization:organization, sector:{partyLabel:"Customer",recordLabel:"Invoice",paymentLabel:"Payment",description:"Client work and commercial receivables."}, capabilities:["customers","invoices","payments","collections","reports","assistant"], rules:{currencyLockedAfterFirstInvoice:true,paymentCannotExceedBalance:true,tenantScoped:true} };
+	}
+
+	public struct function getPersonalSummary(){
+		if(isPostgresMode()) return postgresRepository.getPersonalSummary();
+		throw(type="DuePilot.PersistenceRequired",message="Personal obligations require PostgreSQL persistence mode.");
+	}
+
+	public struct function createCustomer(required string name,string contactName="",string email="",string phone="",string externalReference=""){
+		if(isPostgresMode()) return postgresRepository.createCustomer(arguments.name,arguments.contactName,arguments.email,arguments.phone,arguments.externalReference);
+		throw(type="DuePilot.PersistenceRequired",message="Customer creation requires PostgreSQL persistence mode.");
+	}
+
 	public struct function updateOrganization(
 		required string name,
 		required string currency,

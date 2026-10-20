@@ -85,6 +85,16 @@ component extends="coldbox.system.EventHandler" {
 		} );
 	}
 
+	function workspaceContext( event, rc, prc ){
+		if ( !requireMethod( event, "GET" ) || !requireAuthentication( event ) ) return request.duePilotApiResponse;
+		return success( event, duePilotService.getWorkspaceContext() );
+	}
+
+	function personalSummary( event, rc, prc ){
+		if ( !requireMethod( event, "GET" ) || !requireAuthentication( event ) ) return request.duePilotApiResponse;
+		try { return success( event, duePilotService.getPersonalSummary() ); } catch ( any error ) { return failure( event, 422, "PERSONAL_SUMMARY_UNAVAILABLE", error.message ); }
+	}
+
 	function logout( event, rc, prc ){
 		if ( !requireMethod( event, "POST" ) ) return request.duePilotApiResponse;
 		if ( !requireAuthentication( event ) || !requireCsrf( event ) ) return request.duePilotApiResponse;
@@ -238,8 +248,14 @@ component extends="coldbox.system.EventHandler" {
 	}
 
 	function customers( event, rc, prc ){
-		if ( !requireMethod( event, "GET" ) ) return request.duePilotApiResponse;
 		if ( !requireAuthentication( event ) ) return request.duePilotApiResponse;
+		var method = uCase(cgi.request_method ?: "GET");
+		if(method == "POST"){
+			if(!requireCsrf(event)) return request.duePilotApiResponse;
+			param rc.name=""; param rc.contactName=""; param rc.email=""; param rc.phone=""; param rc.externalReference="";
+			try{return success(event,duePilotService.createCustomer(rc.name,rc.contactName,rc.email,rc.phone,rc.externalReference),{},201);}catch(any error){return failure(event,422,"CUSTOMER_VALIDATION_FAILED",error.message);}
+		}
+		if ( method != "GET" ) return request.duePilotApiResponse;
 		param rc.search = "";
 		return success( event, duePilotService.listCustomers( rc.search ), {
 			filters : { search : rc.search }

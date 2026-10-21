@@ -7,7 +7,7 @@ services:
     environment:
       POSTGRES_DB: "${DB_DATABASE:-duepilot}"
       POSTGRES_USER: "${DB_USER:-duepilot}"
-      POSTGRES_PASSWORD: "${DB_PASSWORD:-duepilot-local-password}"
+      POSTGRES_PASSWORD: "${DB_PASSWORD:-change-me-for-local-development}"
     ports:
       - "${DB_PUBLIC_PORT:-5432}:5432"
     volumes:
@@ -15,12 +15,45 @@ services:
       - ../database/migrations/001_foundation.sql:/docker-entrypoint-initdb.d/001_foundation.sql:ro
       - ../database/migrations/002_identity_admin_and_profiles.sql:/docker-entrypoint-initdb.d/002_identity_admin_and_profiles.sql:ro
       - ../database/migrations/003_personal_dues.sql:/docker-entrypoint-initdb.d/003_personal_dues.sql:ro
+      - ../database/migrations/004_subscriptions_and_nested_workspaces.sql:/docker-entrypoint-initdb.d/004_subscriptions_and_nested_workspaces.sql:ro
+      - ../database/migrations/005_workspace_units.sql:/docker-entrypoint-initdb.d/005_workspace_units.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 10
       start_period: 15s
+
+  # PostgreSQL only runs /docker-entrypoint-initdb.d on a brand-new volume.
+  # Run the latest idempotent application migration on every compose startup
+  # so an existing local volume cannot leave the API one schema version behind.
+  migrations:
+    image: postgres:17-alpine
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      POSTGRES_DB: "${DB_DATABASE:-duepilot}"
+      POSTGRES_USER: "${DB_USER:-duepilot}"
+      POSTGRES_PASSWORD: "${DB_PASSWORD:-change-me-for-local-development}"
+    volumes:
+      - ../database/migrations/004_subscriptions_and_nested_workspaces.sql:/migrations/004_subscriptions_and_nested_workspaces.sql:ro
+      - ../database/migrations/005_workspace_units.sql:/migrations/005_workspace_units.sql:ro
+    entrypoint: ["/bin/sh", "-c"]
+    # Keep the complete shell command as one Cmd argument. A plain folded
+    # string is split by Compose before it reaches `sh -c`, which can make the
+    # migration appear successful without executing psql.
+    command:
+      - >-
+        PGPASSWORD="$${POSTGRES_PASSWORD}" psql
+        --host=postgres --port=5432 --username="$${POSTGRES_USER}"
+        --dbname="$${POSTGRES_DB}" --set=ON_ERROR_STOP=1
+        --file=/migrations/004_subscriptions_and_nested_workspaces.sql &&
+        PGPASSWORD="$${POSTGRES_PASSWORD}" psql
+        --host=postgres --port=5432 --username="$${POSTGRES_USER}"
+        --dbname="$${POSTGRES_DB}" --set=ON_ERROR_STOP=1
+        --file=/migrations/005_workspace_units.sql
 
   backend:
     build:
@@ -37,6 +70,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      migrations:
+        condition: service_completed_successfully
     environment:
       PORT: 8080
       ENVIRONMENT: development
@@ -54,7 +89,7 @@ services:
       DB_DATABASE: "${DB_DATABASE:-duepilot}"
       DB_DRIVER: postgresql
       DB_USER: "${DB_USER:-duepilot}"
-      DB_PASSWORD: "${DB_PASSWORD:-duepilot-local-password}"
+      DB_PASSWORD: "${DB_PASSWORD:-change-me-for-local-development}"
       DB_CONNECTIONSTRING: "jdbc:postgresql://postgres:5432/${DB_DATABASE:-duepilot}"
     ports:
       - "${APP_PORT:-8080}:8080"

@@ -10,8 +10,8 @@
 			<div class="portal-details">
 				<div class="portal-detail"><small>BILLED TO</small><strong>#encodeForHTML( prc.invoice.customerName )#</strong></div>
 				<div class="portal-detail"><small>DESCRIPTION</small><strong>#encodeForHTML( prc.invoice.description )#</strong></div>
-				<div class="portal-detail"><small>ISSUE DATE</small><strong>#dateFormat( parseDateTime( prc.invoice.issueDate ), 'dd mmm yyyy' )#</strong></div>
-				<div class="portal-detail"><small>DUE DATE</small><strong>#dateFormat( parseDateTime( prc.invoice.dueDate ), 'dd mmm yyyy' )#</strong></div>
+				<div class="portal-detail"><small>ISSUE DATE</small><strong>#dateFormat( parseDateTime( prc.invoice.issueDate ), 'dd MMM yyyy' )#</strong></div>
+				<div class="portal-detail"><small>DUE DATE</small><strong>#dateFormat( parseDateTime( prc.invoice.dueDate ), 'dd MMM yyyy' )#</strong></div>
 				<div class="portal-detail"><small>PURCHASE ORDER</small><strong>#len( prc.invoice.purchaseOrder ) ? encodeForHTML( prc.invoice.purchaseOrder ) : 'Not provided'#</strong></div>
 				<div class="portal-detail"><small>INVOICE TOTAL</small><strong>#dpMoney( prc.invoice.amount )#</strong></div>
 			</div>
@@ -37,7 +37,7 @@
 <dialog id="portal-promise">
 	<form method="post" action="#event.buildLink( 'pay/#prc.invoice.portalToken#/promise' )#" data-validated-form>
 		<div class="dialog-header"><h3>Promise a payment date</h3><button class="icon-button" type="button" data-dialog-close aria-label="Close dialog"><i class="bi bi-x-lg" aria-hidden="true"></i></button></div>
-		<div class="dialog-body"><input type="hidden" name="csrfToken" value="#prc.csrfToken#"><div class="form-group"><label>When do you expect to pay?</label><input class="form-control" name="promiseDate" type="date" min="#dateFormat( now(), 'yyyy-mm-dd' )#" required></div><div class="form-group"><label>Optional note</label><textarea class="form-control" name="note" maxlength="500" placeholder="Add any context for the finance team"></textarea></div></div>
+		<div class="dialog-body"><input type="hidden" name="csrfToken" value="#prc.csrfToken#"><div class="form-group"><label>When do you expect to pay?</label><input class="form-control" name="promiseDate" type="date" min="#dateFormat( now(), 'yyyy-MM-dd' )#" required></div><div class="form-group"><label>Optional note</label><textarea class="form-control" name="note" maxlength="500" placeholder="Add any context for the finance team"></textarea></div></div>
 		<div class="dialog-actions"><button class="button button-secondary" type="button" data-dialog-close>Cancel</button><button class="button button-primary" type="submit">Share payment date</button></div>
 	</form>
 </dialog>

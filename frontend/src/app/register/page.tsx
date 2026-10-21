@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { ProductIcon } from "@/components/product-icon";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { apiRequest } from "@/lib/api";
-import type { User, Workspace } from "@/types/api";
+import type { Session } from "@/types/api";
 
 const organizationTypes = [["business", "Business / professional services"], ["school", "School"], ["college", "College"], ["coaching", "Coaching centre"], ["property", "Property management"], ["healthcare", "Healthcare"], ["subscription", "Subscription business"], ["other", "Other"]] as const;
 
@@ -29,7 +29,7 @@ export default function RegisterPage() {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setError("Enter a valid work email address."); return; }
     if (!/^(?=.*[A-Za-z])(?=.*\d).{12,200}$/.test(password)) { setError("Use 12 or more characters with at least one letter and one number."); return; }
     setSubmitting(true);
-    const result = await apiRequest<{ user: User; workspace: Workspace }>("/auth/register", { method: "POST", body: JSON.stringify({ workspaceName, organizationType: form.get("organizationType"), name, email, password }) });
+    const result = await apiRequest<Session>("/auth/register", { method: "POST", body: JSON.stringify({ workspaceName, organizationType: form.get("organizationType"), name, email, password }) });
     setSubmitting(false);
     if (!result.ok) { setError(result.error.message); return; }
     router.replace("/app/dashboard");

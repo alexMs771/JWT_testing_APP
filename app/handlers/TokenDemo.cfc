@@ -35,12 +35,16 @@ component extends="coldbox.system.EventHandler" {
 	 * issue() demo — mint a fresh token pair for a caller-supplied subject.
 	 */
 	function issue( event, rc, prc ){
+		ensureTokens();
 		param rc.id    = "";
 		param rc.role  = "customer";
 		param rc.email = "";
 
 		try {
-			var subject = { id : trim( rc.id ), role : trim( rc.role ) };
+			var subject = demoSubject( session.demoEntitlement );
+			subject.id = trim( rc.id );
+			subject.role = trim( rc.role );
+			subject.roles = [ trim( rc.role ) ];
 			if ( len( trim( rc.email ) ) ) {
 				subject[ "email" ] = trim( rc.email );
 			}
@@ -79,6 +83,32 @@ component extends="coldbox.system.EventHandler" {
 				persistStruct = { flashMsg : "refresh() failed: #e.message#", flashType : "danger" }
 			);
 		}
+	}
+
+	/**
+	 * Demo-only plan switch. This intentionally uses short TTLs so a reviewer
+	 * can watch entitlement expiry without waiting a year. Production billing
+	 * uses SubscriptionService and a one-year server-side subscription record.
+	 */
+	function subscribe( event, rc, prc ){
+		ensureTokens();
+		param rc.plan = "plus";
+		var requestedPlan = lCase(trim(rc.plan));
+		if (!listFindNoCase("plus,pro", requestedPlan)) {
+			relocate(event="tokenDemo.index",persistStruct={flashMsg:"Choose Plus or Pro for the demo.",flashType:"danger"});
+			return;
+		}
+		var demoDuration = requestedPlan == "plus" ? 120 : 180;
+		lock scope="session" type="exclusive" timeout="5" {
+			var state = session.demoEntitlement;
+			state.plan = requestedPlan;
+			state.subscriptionStatus = "active";
+			state.startedAt = nowEpoch();
+			state.expiresAt = state.startedAt + demoDuration;
+			session.demoEntitlement = state;
+			session.demoTokens = tokenManager.issue(demoSubject(state));
+		}
+		relocate(event="tokenDemo.index",persistStruct={flashMsg:"#requestedPlan# activated for the demo. It expires in #demoDuration# seconds; the signed claims will then return to free/expired.",flashType:"success"});
 	}
 
 	/**
@@ -130,6 +160,12 @@ component extends="coldbox.system.EventHandler" {
 			"accessTokenExpiry"  : settings.accessTokenExpiry,
 			"refreshTokenExpiry" : settings.refreshTokenExpiry
 		};
+		prc.demoState = session.demoEntitlement;
+		prc.planCatalog = [
+			{key:"free",name:"Free",duration:"5 minutes",ai:"3 requests",workspaces:"Main only"},
+			{key:"plus",name:"Plus",duration:"2 minutes",ai:"100 requests",workspaces:"2 nested"},
+			{key:"pro",name:"Pro",duration:"3 minutes",ai:"Full monthly quota",workspaces:"19 nested"}
+		];
 
 		prc.tokens        = session.demoTokens;
 		prc.accessClaims  = tokenManager.decode( prc.tokens.accessToken );
@@ -150,13 +186,51 @@ component extends="coldbox.system.EventHandler" {
 	 * Guarantee a live token pair exists in the session for the demo.
 	 */
 	private void function ensureTokens(){
-		if ( !structKeyExists( session, "demoTokens" ) ) {
-			lock scope="session" type="exclusive" timeout="5" {
-				if ( !structKeyExists( session, "demoTokens" ) ) {
-					session.demoTokens = tokenManager.issue( { id : "alex", role : "customer", email : "alex@demo.io" } );
-				}
+		lock scope="session" type="exclusive" timeout="5" {
+			if ( !structKeyExists( session, "demoEntitlement" ) ) {
+				var started = nowEpoch();
+				session.demoEntitlement = {plan:"free",subscriptionStatus:"trialing",startedAt:started,expiresAt:started+300,freeWindowExpiresAt:started+300};
+			}
+			if ( !structKeyExists( session, "demoTokens" ) ) session.demoTokens = tokenManager.issue(demoSubject(session.demoEntitlement));
+		}
+		syncDemoEntitlement();
+	}
+
+	private void function syncDemoEntitlement(){
+		lock scope="session" type="exclusive" timeout="5" {
+			if (!structKeyExists(session,"demoEntitlement")) return;
+			var state = session.demoEntitlement;
+			var now = nowEpoch();
+			var expired = val(state.expiresAt ?: 0) <= now;
+			if (expired && state.plan != "free") {
+				state.plan = "free";
+				state.subscriptionStatus = "expired";
+				state.expiresAt = state.freeWindowExpiresAt ?: now;
+				session.demoEntitlement = state;
+				session.demoTokens = tokenManager.issue(demoSubject(state));
+			} else if (state.plan == "free" && val(state.freeWindowExpiresAt ?: state.expiresAt) <= now && state.subscriptionStatus != "expired") {
+				state.subscriptionStatus = "expired";
+				state.expiresAt = state.freeWindowExpiresAt;
+				session.demoEntitlement = state;
+				session.demoTokens = tokenManager.issue(demoSubject(state));
 			}
 		}
+	}
+
+	private struct function demoSubject(required struct state){
+		var plan = lCase(trim(toString(arguments.state.plan ?: "free")));
+		var aiLimit = plan == "pro" ? -1 : plan == "plus" ? 100 : 3;
+		var childLimit = plan == "pro" ? 19 : plan == "plus" ? 2 : 0;
+		return {
+			id:"alex",
+			role:"member",
+			roles:["member"],
+			email:"alex@demo.io",
+			plan:plan,
+			subscriptionStatus:arguments.state.subscriptionStatus ?: "active",
+			subscriptionExpiresAt:arguments.state.expiresAt ?: 0,
+			entitlements:{aiRequestsPerMonth:aiLimit,childWorkspaces:childLimit,aiEnabled:plan != "free"}
+		};
 	}
 
 	/**

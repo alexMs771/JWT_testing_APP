@@ -24,8 +24,8 @@
 					<tr>
 						<td><a class="table-link" href="#event.buildLink( 'invoices/#invoice.id#' )#">#invoice.invoiceNumber#</a><br><small class="text-muted">#encodeForHTML( invoice.purchaseOrder )#</small></td>
 						<td><div class="customer-cell"><span class="customer-avatar">#encodeForHTML( uCase( left( listFirst( invoice.customerName, ' ' ), 1 ) & left( listLast( invoice.customerName, ' ' ), 1 ) ) )#</span><span><a class="table-link" href="#event.buildLink( 'customers/#invoice.customerId#' )#">#encodeForHTML( invoice.customerName )#</a><small>Customer account</small></span></div></td>
-						<td>#dateFormat( parseDateTime( invoice.issueDate ), 'dd mmm yyyy' )#</td>
-						<td>#dateFormat( parseDateTime( invoice.dueDate ), 'dd mmm yyyy' )#<br><small class="#invoice.daysOverdue ? 'text-danger' : 'text-muted'#">#dpDueLabel( invoice )#</small></td>
+						<td>#dateFormat( parseDateTime( invoice.issueDate ), 'dd MMM yyyy' )#</td>
+						<td>#dateFormat( parseDateTime( invoice.dueDate ), 'dd MMM yyyy' )#<br><small class="#invoice.daysOverdue ? 'text-danger' : 'text-muted'#">#dpDueLabel( invoice )#</small></td>
 						<td><span class="status-badge status-#dpStatusClass( invoice.status )#">#dpStatusLabel( invoice.status )#</span></td>
 						<td class="text-right">#dpMoney( invoice.amount )#</td>
 						<td class="text-right fw-semibold">#dpMoney( invoice.outstanding )#</td>

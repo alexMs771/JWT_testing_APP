@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { ProductIcon } from "@/components/product-icon";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { apiRequest } from "@/lib/api";
-import type { User, Workspace } from "@/types/api";
+import type { Session } from "@/types/api";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -24,7 +24,7 @@ export default function LoginPage() {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) { setError("Enter a valid work email address."); return; }
     if (password.length < 12) { setError("Your password must contain at least 12 characters."); return; }
     setSubmitting(true);
-    const result = await apiRequest<{ user: User; workspace: Workspace }>("/auth/login", { method: "POST", body: JSON.stringify({ email: cleanEmail, password }) });
+    const result = await apiRequest<Session>("/auth/login", { method: "POST", body: JSON.stringify({ email: cleanEmail, password }) });
     setSubmitting(false);
     if (!result.ok) { setError(result.error.message); return; }
     router.push(result.data.user.isPlatformAdmin ? "/admin" : "/app/dashboard");

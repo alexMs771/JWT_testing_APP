@@ -1,0 +1,12 @@
+{
+    "app":{
+        "cfengine":"boxlang@1.18.6"
+    },
+    "name":"duepilot-ai-test",
+    "web":{
+        "http":{
+            "port":"8093"
+        }
+    },
+    "webroot":"public"
+}

@@ -43,6 +43,12 @@ component {
         route('/api/v1/auth/logout', 'apiV1.logout').end();
         route('/api/v1/auth/me', 'apiV1.me').end();
         route('/api/v1/workspace/context', 'apiV1.workspaceContext').end();
+        route('/api/v1/subscription/subscribe', 'apiV1.subscribe').end();
+        // Keep the more specific subscription action before the collection
+        // route. ColdBox evaluates these routes in declaration order.
+        route('/api/v1/subscription', 'apiV1.subscription').end();
+        route('/api/v1/workspaces', 'apiV1.workspaces').end();
+        route('/api/v1/workspace/units', 'apiV1.workspaceUnits').end();
         route('/api/v1/personal/summary', 'apiV1.personalSummary').end();
         route('/api/v1/personal/profile', 'apiV1.personalProfile').end();
         route('/api/v1/personal/obligations', 'apiV1.personalObligations').end();
@@ -72,6 +78,7 @@ component {
         route('/demo/issue', 'tokenDemo.issue').end();
         route('/demo/refresh', 'tokenDemo.refresh').end();
         route('/demo/inspect', 'tokenDemo.inspect').end();
+        route('/demo/subscribe', 'tokenDemo.subscribe').end();
         route('/demo', 'tokenDemo.index').end();
 
         route('/api/echo', function(event, rc, prc) {

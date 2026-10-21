@@ -295,7 +295,7 @@ component singleton {
 			}
 			invoice.paidAmount = invoice.paidAmount + arguments.amount;
 			invoice.paymentRef = trim( arguments.reference );
-			invoice.paidAt     = dateTimeFormat( now(), "yyyy-mm-dd HH:nn" );
+			invoice.paidAt     = dateTimeFormat( now(), "yyyy-MM-dd HH:nn" );
 			invoice.statusOverride = invoice.paidAmount >= invoice.amount ? "paid" : "";
 			variables.store.invoices[ index ] = invoice;
 			updatedInvoice = invoice;
@@ -328,13 +328,13 @@ component singleton {
 			}
 			invoice.promiseDate   = normalizedPromiseDate;
 			invoice.promiseNote   = trim( arguments.note );
-			invoice.lastContactAt = dateTimeFormat( now(), "yyyy-mm-dd HH:nn" );
+			invoice.lastContactAt = dateTimeFormat( now(), "yyyy-MM-dd HH:nn" );
 			variables.store.invoices[ index ] = invoice;
 			updatedInvoice = invoice;
 			addActivity(
 				"promise",
 				"Payment promise captured",
-				"#invoice.invoiceNumber# - expected #dateFormat( parseDateTime( normalizedPromiseDate ), "dd mmm yyyy" )#",
+				"#invoice.invoiceNumber# - expected #dateFormat( parseDateTime( normalizedPromiseDate ), "dd MMM yyyy" )#",
 				invoice.id
 			);
 		}
@@ -357,7 +357,7 @@ component singleton {
 			}
 			invoice.statusOverride = "disputed";
 			invoice.disputeReason  = cleanReason;
-			invoice.lastContactAt  = dateTimeFormat( now(), "yyyy-mm-dd HH:nn" );
+			invoice.lastContactAt  = dateTimeFormat( now(), "yyyy-MM-dd HH:nn" );
 			variables.store.invoices[ index ] = invoice;
 			updatedInvoice = invoice;
 			addActivity(
@@ -384,7 +384,7 @@ component singleton {
 				throw( type = "DuePilot.AlreadyPaid", message = "A reminder cannot be sent for a paid invoice." );
 			}
 			invoice.reminderCount++;
-			invoice.lastContactAt = dateTimeFormat( now(), "yyyy-mm-dd HH:nn" );
+			invoice.lastContactAt = dateTimeFormat( now(), "yyyy-MM-dd HH:nn" );
 			variables.store.invoices[ index ] = invoice;
 			updatedInvoice = invoice;
 			addActivity(
@@ -472,39 +472,100 @@ component singleton {
 	 * Contact details, portal tokens and internal identifiers are excluded.
 	 */
 	public struct function getAssistantContext(){
-		var dashboard = getDashboard();
-		var queue     = getCollectionQueue();
-		var priorities = [];
+		var dashboard        = getDashboard();
+		var queue            = getCollectionQueue();
+		var customers        = listCustomers();
+		var workspaceContext = getWorkspaceContext();
+		var organization     = dashboard.organization;
+		var priorities       = [];
+		var openInvoices     = [];
+		var customerContext  = [];
+		var activityContext  = [];
+		var organizationType = structKeyExists( organization, "organizationType" ) ? organization.organizationType : "business";
+		var sector           = structKeyExists( workspaceContext, "sector" ) ? workspaceContext.sector : {};
 
-		for ( var index = 1; index <= min( 5, queue.len() ); index++ ) {
+		/*
+		 * This is the assistant's retrieval document, not a copy of the database.
+		 * Keep it intentionally safe: no contact details, portal tokens, IDs or
+		 * credentials are sent to the model. The larger, structured snapshot lets
+		 * retrieval answer exact workspace, customer, invoice and aging questions.
+		 */
+		for ( var index = 1; index <= min( 12, queue.len() ); index++ ) {
 			var invoice = queue[ index ];
-			priorities.append( {
+			var statusLabel = invoice.status == "disputed"
+				? "Disputed"
+				: ( invoice.daysOverdue > 0 ? invoice.daysOverdue & " days overdue" : "Due in " & invoice.daysUntilDue & " days" );
+			var safeInvoice = {
 				invoiceNumber : invoice.invoiceNumber,
 				customerName  : invoice.customerName,
+				description   : left( structKeyExists( invoice, "description" ) ? toString( invoice.description ) : "", 180 ),
+				amount        : invoice.amount,
+				paidAmount    : invoice.paidAmount,
 				outstanding   : invoice.outstanding,
+				issueDate     : invoice.issueDate,
+				dueDate       : invoice.dueDate,
+				daysUntilDue  : invoice.daysUntilDue,
 				daysOverdue   : invoice.daysOverdue,
 				status        : invoice.status,
-				statusLabel   : invoice.status == "disputed"
-					? "Disputed"
-					: ( invoice.daysOverdue > 0 ? invoice.daysOverdue & " days overdue" : "Due in " & invoice.daysUntilDue & " days" ),
-				promiseDate   : invoice.promiseDate
+				statusLabel   : statusLabel,
+				promiseDate   : invoice.promiseDate,
+				reminderCount : invoice.reminderCount
+			};
+			if ( structKeyExists( invoice, "disputeReason" ) && len( trim( toString( invoice.disputeReason ) ) ) ) {
+				safeInvoice.disputeReason = left( toString( invoice.disputeReason ), 180 );
+			}
+			openInvoices.append( safeInvoice );
+			if ( index <= 8 ) priorities.append( safeInvoice );
+		}
+
+		for ( var customerIndex = 1; customerIndex <= min( 12, customers.len() ); customerIndex++ ) {
+			var customer = customers[ customerIndex ];
+			customerContext.append( {
+				name         : customer.name,
+				invoiceCount : customer.invoiceCount,
+				outstanding  : customer.outstanding,
+				overdue      : customer.overdue,
+				paid         : customer.paid,
+				health       : customer.health
+			} );
+		}
+
+		for ( var activity in getRecentActivity( 8 ) ) {
+			activityContext.append( {
+				kind   : activity.kind,
+				title  : left( toString( activity.title ), 180 ),
+				detail : left( toString( activity.detail ), 220 ),
+				at     : activity.at
 			} );
 		}
 
 		return {
-			generatedAt : dateTimeFormat( dateConvert( "local2utc", now() ), "yyyy-mm-dd HH:nn 'UTC'" ),
-			currency    : dashboard.organization.currency,
+			generatedAt : dateTimeFormat( dateConvert( "local2utc", now() ), "yyyy-MM-dd HH:nn 'UTC'" ),
+			currency    : organization.currency,
+			workspace   : {
+				name             : organization.name,
+				organizationType : organizationType,
+				plan             : organization.plan,
+				currency         : organization.currency,
+				sector           : sector
+			},
+			sector      : sector,
 			summary     : {
 				outstanding     : dashboard.outstanding,
 				overdueAmount   : dashboard.overdueAmount,
 				overdueCount    : dashboard.overdueCount,
 				dueSoonAmount   : dashboard.dueSoonAmount,
 				disputedAmount  : dashboard.disputedAmount,
+				collectedAmount : dashboard.collectedAmount,
 				collectionRate  : dashboard.collectionRate,
+				customerCount   : dashboard.customerCount,
 				openInvoiceCount: queue.len()
 			},
-			aging      : dashboard.aging,
-			priorities : priorities
+			aging       : dashboard.aging,
+			priorities  : priorities,
+			openInvoices: openInvoices,
+			customers   : customerContext,
+			activity    : activityContext
 		};
 	}
 
@@ -513,7 +574,7 @@ component singleton {
 		if ( !reFind( "^\d{4}-\d{2}-\d{2}$", candidate ) || !isDate( candidate ) ) {
 			throw( type = "DuePilot.InvalidDate", message = arguments.label & " must be a valid date." );
 		}
-		return dateFormat( parseDateTime( candidate ), "yyyy-mm-dd" );
+		return dateFormat( parseDateTime( candidate ), "yyyy-MM-dd" );
 	}
 
 	private array function buildCustomers(){
@@ -579,8 +640,8 @@ component singleton {
 			statusOverride : arguments.statusOverride,
 			disputeReason  : arguments.disputeReason,
 			reminderCount  : arguments.reminderCount,
-			lastContactAt  : arguments.reminderCount ? dateTimeFormat( dateAdd( "d", -1, now() ), "yyyy-mm-dd HH:nn" ) : "",
-			paidAt         : arguments.statusOverride == "paid" ? dateTimeFormat( dateAdd( "d", arguments.paidOffset, now() ), "yyyy-mm-dd HH:nn" ) : "",
+			lastContactAt  : arguments.reminderCount ? dateTimeFormat( dateAdd( "d", -1, now() ), "yyyy-MM-dd HH:nn" ) : "",
+			paidAt         : arguments.statusOverride == "paid" ? dateTimeFormat( dateAdd( "d", arguments.paidOffset, now() ), "yyyy-MM-dd HH:nn" ) : "",
 			paymentRef     : arguments.paymentRef,
 			portalToken    : lCase( replace( createUUID(), "-", "", "all" ) )
 		};
@@ -588,7 +649,7 @@ component singleton {
 
 	private array function buildActivities(){
 		return [
-			{ kind : "promise", title : "Kaveri Systems promised payment", detail : "INV-#year( now() )#-1046 - expected #dateFormat( dateAdd( "d", 2, now() ), "dd mmm" )#", at : "18 minutes ago", invoiceId : "inv-1046" },
+			{ kind : "promise", title : "Kaveri Systems promised payment", detail : "INV-#year( now() )#-1046 - expected #dateFormat( dateAdd( "d", 2, now() ), "dd MMM" )#", at : "18 minutes ago", invoiceId : "inv-1046" },
 			{ kind : "dispute", title : "PixelCraft raised a dispute", detail : "Purchase order amount mismatch", at : "1 hour ago", invoiceId : "inv-1045" },
 			{ kind : "payment", title : "Payment received from BluePeak", detail : "#moneyLabel( 98000 )# - UTR982135710", at : "Yesterday", invoiceId : "inv-1041" },
 			{ kind : "reminder", title : "Reminder sent to Atlas Manufacturing", detail : "INV-#year( now() )#-1048 - email reminder 3", at : "Yesterday", invoiceId : "inv-1048" },
@@ -716,7 +777,7 @@ component singleton {
 	}
 
 	private string function dateText( required numeric dayOffset ){
-		return dateFormat( dateAdd( "d", arguments.dayOffset, now() ), "yyyy-mm-dd" );
+		return dateFormat( dateAdd( "d", arguments.dayOffset, now() ), "yyyy-MM-dd" );
 	}
 
 	private string function moneyLabel( required numeric amount ){

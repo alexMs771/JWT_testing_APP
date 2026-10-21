@@ -1,0 +1,314 @@
+/* Demo-only brand and marketing polish. The mark is loaded directly from the
+   supplied PNG so it does not depend on a nested image inside an SVG. */
+.dc-marketing {
+  background: linear-gradient(180deg, #f8fcfb 0%, #f2f8f8 100%);
+}
+
+.dc-marketing-nav {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  width: min(100% - 48px, 1196px);
+  min-height: 78px;
+  height: auto;
+  padding: 14px 2px;
+  border-bottom: 1px solid rgba(13, 45, 73, .09);
+  background: rgba(248, 252, 251, .92);
+  backdrop-filter: blur(18px);
+}
+
+.dc-marketing-nav .dc-logo,
+.dc-personal-login > header .dc-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  width: auto !important;
+  height: auto !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: #0d2d49;
+  font-size: 19px;
+  font-weight: 850;
+  letter-spacing: -.055em;
+  line-height: 1;
+  text-decoration: none;
+}
+
+.dc-marketing-nav .dc-logo::before,
+.dc-personal-login > header .dc-logo::before,
+.dc-sidebar .dc-brand::before {
+  display: block;
+  flex: 0 0 auto;
+  width: 42px;
+  height: 42px;
+  content: "";
+  border: 1px solid rgba(13, 45, 73, .12);
+  border-radius: 12px;
+  background-color: #fff;
+  background-image: url("/duepilot-reference.png");
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 176% 176%;
+  box-shadow: 0 8px 18px rgba(13, 45, 73, .12);
+}
+
+.dc-marketing-nav .dc-logo::after,
+.dc-personal-login > header .dc-logo::after {
+  content: "DuePilot";
+}
+
+.dc-marketing-nav .dc-logo > img,
+.dc-personal-login > header .dc-logo > img,
+.dc-sidebar .dc-brand > img {
+  display: none !important;
+}
+
+.dc-marketing-nav nav {
+  align-items: center;
+  gap: 30px;
+}
+
+.dc-marketing-nav nav button {
+  position: relative;
+  padding: 9px 0;
+  color: #5f7890;
+  font-size: 12px;
+  font-weight: 700;
+  transition: color .2s ease;
+}
+
+.dc-marketing-nav nav button::after {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  content: "";
+  border-radius: 99px;
+  background: #0ca9a8;
+  transform: scaleX(0);
+  transition: transform .2s ease;
+}
+
+.dc-marketing-nav nav button:hover {
+  color: #0d2d49;
+}
+
+.dc-marketing-nav nav button:hover::after {
+  transform: scaleX(1);
+}
+
+.dc-marketing-nav > div {
+  gap: 10px;
+}
+
+.dc-marketing-nav > div > a {
+  min-height: 40px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: #0d2d49;
+  box-shadow: 0 9px 18px rgba(13, 45, 73, .16);
+  font-size: 12px;
+  letter-spacing: -.01em;
+  transition: transform .2s ease, box-shadow .2s ease;
+}
+
+.dc-marketing-nav > div > a:hover {
+  box-shadow: 0 12px 24px rgba(13, 45, 73, .23);
+  transform: translateY(-1px);
+}
+
+.dc-hero {
+  width: min(100% - 48px, 1196px);
+  margin: 14px auto 0;
+  border: 1px solid rgba(123, 207, 207, .18);
+  border-radius: 26px;
+  box-shadow: 0 24px 60px rgba(13, 45, 73, .14);
+  overflow: hidden;
+}
+
+.dc-hero h1 {
+  max-width: 610px;
+  letter-spacing: -.075em;
+}
+
+.dc-hero-actions button,
+.dc-hero-actions a {
+  min-height: 46px;
+  border-radius: 10px;
+  font-weight: 800;
+}
+
+.dc-explorer {
+  padding-top: 88px;
+  padding-bottom: 92px;
+}
+
+.dc-lens-grid button {
+  min-height: 96px;
+  border-radius: 12px;
+  box-shadow: 0 8px 20px rgba(13, 45, 73, .035);
+  transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease;
+}
+
+.dc-lens-grid button:hover {
+  box-shadow: 0 15px 30px rgba(13, 45, 73, .10);
+  transform: translateY(-2px);
+}
+
+.dc-sidebar .dc-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  width: auto !important;
+  height: auto !important;
+  min-height: 42px;
+  margin: 0 8px 25px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: #fff;
+  font-size: 19px;
+  font-weight: 850;
+  letter-spacing: -.055em;
+  line-height: 1;
+  text-decoration: none;
+}
+
+.dc-sidebar .dc-brand::before {
+  width: 40px;
+  height: 40px;
+  border-color: rgba(255, 255, 255, .25);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, .18);
+}
+
+.dc-sidebar .dc-brand::after {
+  content: "DuePilot";
+}
+
+.dc-sidebar .dc-brand span,
+.dc-sidebar .dc-brand img {
+  display: none !important;
+}
+
+html[data-theme="dark"] .dc-marketing {
+  background: #071522;
+}
+
+html[data-theme="dark"] .dc-marketing-nav {
+  border-color: rgba(156, 202, 221, .14);
+  background: rgba(7, 21, 34, .90);
+}
+
+html[data-theme="dark"] .dc-marketing-nav .dc-logo,
+html[data-theme="dark"] .dc-personal-login > header .dc-logo {
+  color: #f4f8ff;
+}
+
+html[data-theme="dark"] .dc-marketing-nav nav button {
+  color: #a5bfd0;
+}
+
+html[data-theme="dark"] .dc-marketing-nav nav button:hover {
+  color: #f4f8ff;
+}
+
+@media (max-width: 780px) {
+  .dc-marketing-nav,
+  .dc-hero {
+    width: min(100% - 30px, 690px);
+  }
+
+  .dc-marketing-nav {
+    min-height: 70px;
+    padding: 11px 0;
+  }
+
+  .dc-marketing-nav .dc-logo,
+  .dc-personal-login > header .dc-logo {
+    font-size: 17px;
+  }
+
+  .dc-marketing-nav .dc-logo::before,
+  .dc-personal-login > header .dc-logo::before {
+    width: 37px;
+    height: 37px;
+    border-radius: 10px;
+  }
+
+  .dc-hero {
+    margin-top: 10px;
+  }
+
+  .dc-explorer {
+    padding-top: 62px;
+    padding-bottom: 65px;
+  }
+}
+
+@media (max-width: 510px) {
+  .dc-marketing-nav {
+    width: min(100% - 28px, 480px);
+  }
+
+  .dc-marketing-nav .dc-logo::before,
+  .dc-personal-login > header .dc-logo::before,
+  .dc-sidebar .dc-brand::before {
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+  }
+
+  .dc-marketing-nav .dc-logo,
+  .dc-personal-login > header .dc-logo,
+  .dc-sidebar .dc-brand {
+    gap: 8px;
+    font-size: 16px;
+  }
+
+  .dc-hero {
+    width: min(100% - 28px, 480px);
+    border-radius: 18px;
+  }
+}
+
+/* Match the public landing brand exactly: transparent mark, no white tile. */
+.dc-marketing-nav .dc-logo::before,
+.dc-personal-login > header .dc-logo::before,
+.dc-sidebar .dc-brand::before {
+  border: 0;
+  border-radius: 0;
+  background-color: transparent;
+  background-image: url("/duepilot-reference.png");
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 176% 176%;
+  box-shadow: none;
+}
+
+.dc-marketing-nav .dc-logo::after,
+.dc-personal-login > header .dc-logo::after {
+  color: transparent;
+  background: linear-gradient(90deg, #172641 0 46%, #315cdb 46% 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+}
+
+.dc-sidebar .dc-brand::after {
+  color: transparent;
+  background: linear-gradient(90deg, #f4f8ff 0 46%, #71a9ff 46% 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+}
+
+html[data-theme="dark"] .dc-marketing-nav .dc-logo::after,
+html[data-theme="dark"] .dc-personal-login > header .dc-logo::after {
+  background: linear-gradient(90deg, #edf3ff 0 46%, #6f8cf4 46% 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+}

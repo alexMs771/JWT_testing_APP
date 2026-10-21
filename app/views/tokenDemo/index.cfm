@@ -2,7 +2,7 @@
 	// ---- tiny view helpers -------------------------------------------------
 	function fmtEpoch( required numeric e ){
 		var localBase = dateConvert( "utc2Local", createDateTime( 1970, 1, 1, 0, 0, 0 ) );
-		return dateTimeFormat( dateAdd( "s", arguments.e, localBase ), "yyyy-mm-dd HH:nn:ss" );
+		return dateTimeFormat( dateAdd( "s", arguments.e, localBase ), "yyyy-MM-dd HH:nn:ss" );
 	}
 	function ttlText( required numeric seconds ){
 		var s = arguments.seconds;
@@ -59,6 +59,25 @@
 			<div class="small">#encodeForHTML( prc.flashMsg )#</div>
 		</div>
 	</cfif>
+
+	<!--- ===================== ENTITLEMENT FLOW ===================== --->
+	<div class="card border-0 shadow-sm mb-4">
+		<div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-center gap-2 py-3">
+			<span class="fw-bold"><i class="bi bi-person-lock text-primary"></i> Real-world entitlement flow</span>
+			<span class="badge #(prc.demoState.plan == 'free' ? 'bg-secondary' : 'bg-primary')#">#encodeForHTML( uCase( prc.demoState.plan ) )# · #encodeForHTML( prc.demoState.subscriptionStatus )#</span>
+		</div>
+		<div class="card-body">
+			<p class="small text-muted mb-3">The demo uses the same signed claims a host app can use for plan-aware authorization. Free access lasts 5 minutes; Plus lasts 2 minutes; Pro lasts 3 minutes. These are demo TTLs only—production subscriptions are one year.</p>
+			<div class="row g-3 mb-3">
+				<cfloop array="#prc.planCatalog#" index="plan">
+					<div class="col-12 col-md-4"><div class="border rounded p-3 h-100 #(prc.demoState.plan == plan.key ? 'border-primary bg-primary-subtle' : 'bg-light')#"><div class="d-flex justify-content-between"><strong>#encodeForHTML( plan.name )#</strong><span class="small text-muted">#encodeForHTML( plan.duration )#</span></div><div class="small text-muted mt-2">AI: #encodeForHTML( plan.ai )#<br>Workspace capacity: #encodeForHTML( plan.workspaces )#</div><cfif plan.key EQ 'plus' OR plan.key EQ 'pro'><form method="post" action="#event.buildLink( 'tokenDemo.subscribe' )#" class="mt-3"><input type="hidden" name="plan" value="#encodeForHTMLAttribute( plan.key )#"><button class="btn btn-sm #(prc.demoState.plan == plan.key ? 'btn-primary' : 'btn-outline-primary')# w-100" #(prc.demoState.plan == plan.key ? 'disabled' : '')#>#(prc.demoState.plan == plan.key ? 'Active' : 'Activate ' & plan.name)#</button></form></cfif></div></div>
+				</cfloop>
+			</div>
+			<div class="alert #(prc.demoState.subscriptionStatus == 'expired' ? 'alert-warning' : 'alert-info')# py-2 mb-0 small">
+				<strong>Signed plan expiry:</strong> #remainText( prc.demoState.expiresAt, prc.nowEpoch )# · access claims are re-issued when the entitlement moves back to free/expired. The role remains <span class="tm-code">member</span> throughout.
+			</div>
+		</div>
+	</div>
 
 	<!--- ===================== SELF-TEST MATRIX ===================== --->
 	<div class="card border-0 shadow-sm mb-4">

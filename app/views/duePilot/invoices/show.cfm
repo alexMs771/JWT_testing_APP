@@ -15,8 +15,8 @@
 			<div class="invoice-summary">
 				<div class="summary-item"><small>Invoice total</small><strong>#dpMoney( prc.invoice.amount )#</strong></div>
 				<div class="summary-item"><small>Amount paid</small><strong class="text-success">#dpMoney( prc.invoice.paidAmount )#</strong></div>
-				<div class="summary-item"><small>Issue date</small><strong>#dateFormat( parseDateTime( prc.invoice.issueDate ), 'dd mmm yyyy' )#</strong></div>
-				<div class="summary-item"><small>Due date</small><strong>#dateFormat( parseDateTime( prc.invoice.dueDate ), 'dd mmm yyyy' )#</strong></div>
+				<div class="summary-item"><small>Issue date</small><strong>#dateFormat( parseDateTime( prc.invoice.issueDate ), 'dd MMM yyyy' )#</strong></div>
+				<div class="summary-item"><small>Due date</small><strong>#dateFormat( parseDateTime( prc.invoice.dueDate ), 'dd MMM yyyy' )#</strong></div>
 			</div>
 			<div class="description-box"><small class="text-muted">DESCRIPTION</small><p>#encodeForHTML( prc.invoice.description )#</p></div>
 		</article>
@@ -24,9 +24,9 @@
 		<article class="panel">
 			<header class="panel-header"><div><h2>Payment timeline</h2><p>Customer follow-up and financial events</p></div></header>
 			<div class="panel-body activity-list">
-				<div class="activity-item"><span class="activity-icon"><i class="bi bi-file-earmark-plus"></i></span><span><strong>Invoice issued</strong><p>#encodeForHTML( prc.invoice.description )#</p></span><time>#dateFormat( parseDateTime( prc.invoice.issueDate ), 'dd mmm' )#</time></div>
+				<div class="activity-item"><span class="activity-icon"><i class="bi bi-file-earmark-plus"></i></span><span><strong>Invoice issued</strong><p>#encodeForHTML( prc.invoice.description )#</p></span><time>#dateFormat( parseDateTime( prc.invoice.issueDate ), 'dd MMM' )#</time></div>
 				<cfif len( prc.invoice.lastContactAt )><div class="activity-item"><span class="activity-icon"><i class="bi bi-send"></i></span><span><strong>Customer contacted</strong><p>#prc.invoice.reminderCount# reminder#prc.invoice.reminderCount == 1 ? '' : 's'# sent</p></span><time>#encodeForHTML( prc.invoice.lastContactAt )#</time></div></cfif>
-				<cfif len( prc.invoice.promiseDate )><div class="activity-item"><span class="activity-icon"><i class="bi bi-calendar-check"></i></span><span><strong>Payment promised</strong><p>#encodeForHTML( prc.invoice.promiseNote ?: 'Customer shared an expected payment date.' )#</p></span><time>#dateFormat( parseDateTime( prc.invoice.promiseDate ), 'dd mmm' )#</time></div></cfif>
+			<cfif len( prc.invoice.promiseDate )><div class="activity-item"><span class="activity-icon"><i class="bi bi-calendar-check"></i></span><span><strong>Payment promised</strong><p>#encodeForHTML( prc.invoice.promiseNote ?: 'Customer shared an expected payment date.' )#</p></span><time>#dateFormat( parseDateTime( prc.invoice.promiseDate ), 'dd MMM' )#</time></div></cfif>
 				<cfif len( prc.invoice.disputeReason )><div class="activity-item"><span class="activity-icon"><i class="bi bi-flag"></i></span><span><strong>Dispute opened</strong><p>#encodeForHTML( prc.invoice.disputeReason )#</p></span><time>Open</time></div></cfif>
 				<cfif prc.invoice.paidAmount GT 0><div class="activity-item"><span class="activity-icon"><i class="bi bi-check2"></i></span><span><strong>Payment received</strong><p>#dpMoney( prc.invoice.paidAmount )# · #encodeForHTML( prc.invoice.paymentRef )#</p></span><time>#len( prc.invoice.paidAt ) ? encodeForHTML( prc.invoice.paidAt ) : 'Recorded'#</time></div></cfif>
 			</div>
@@ -63,7 +63,7 @@
 <dialog id="promise-dialog">
 	<form method="post" action="#event.buildLink( 'invoices/#prc.invoice.id#/promise' )#" data-validated-form>
 		<div class="dialog-header"><h3>Add payment promise</h3><button class="icon-button" type="button" data-dialog-close aria-label="Close dialog"><i class="bi bi-x-lg" aria-hidden="true"></i></button></div>
-		<div class="dialog-body"><input type="hidden" name="csrfToken" value="#prc.csrfToken#"><input type="hidden" name="invoiceId" value="#prc.invoice.id#"><div class="form-group"><label>Expected payment date</label><input class="form-control" name="promiseDate" type="date" min="#dateFormat( now(), 'yyyy-mm-dd' )#" value="#dateFormat( dateAdd( 'd', 7, now() ), 'yyyy-mm-dd' )#" required></div><div class="form-group"><label>Conversation note</label><textarea class="form-control" name="note" maxlength="500" placeholder="What did the customer confirm?"></textarea></div></div>
+		<div class="dialog-body"><input type="hidden" name="csrfToken" value="#prc.csrfToken#"><input type="hidden" name="invoiceId" value="#prc.invoice.id#"><div class="form-group"><label>Expected payment date</label><input class="form-control" name="promiseDate" type="date" min="#dateFormat( now(), 'yyyy-MM-dd' )#" value="#dateFormat( dateAdd( 'd', 7, now() ), 'yyyy-MM-dd' )#" required></div><div class="form-group"><label>Conversation note</label><textarea class="form-control" name="note" maxlength="500" placeholder="What did the customer confirm?"></textarea></div></div>
 		<div class="dialog-actions"><button class="button button-secondary" type="button" data-dialog-close>Cancel</button><button class="button button-primary" type="submit">Save promise</button></div>
 	</form>
 </dialog>

@@ -164,3 +164,373 @@
     width: 130px;
   }
 }
+
+/* Landing-page geometry: keep the hero compact and give the dashboard
+   preview enough horizontal room on desktop. */
+@media (min-width: 901px) {
+  .landing-page .landing-hero {
+    min-height: 0;
+    padding: 58px 0 78px;
+  }
+
+  /* Widen only the dashboard's internal queue/insight grid. The outer hero
+     composition remains unchanged. */
+  .landing-page .preview-grid {
+    width: calc(100% + 10px);
+    grid-template-columns: minmax(0, 1.18fr) minmax(0, .82fr);
+    gap: 12px;
+  }
+}
+
+/* Theme is intentionally a simple navigation action, not a separate pill. */
+.landing-page .landing-theme-toggle {
+  width: auto !important;
+  min-width: 0 !important;
+  height: 36px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--l-muted) !important;
+}
+
+.landing-page .landing-theme-toggle:hover,
+.landing-page .landing-theme-toggle.is-dark,
+.landing-page .landing-theme-toggle.is-dark:hover {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--l-blue) !important;
+}
+
+.landing-page .landing-theme-toggle::after {
+  font-size: 13px;
+  font-weight: 750;
+}
+
+@media (max-width: 650px) {
+  .landing-page .landing-theme-toggle {
+    height: 34px !important;
+  }
+
+  .landing-page .landing-theme-toggle::after {
+    font-size: 12px;
+  }
+}
+
+/* The landing header uses a clear text control instead of exposing the
+   current light/dark icon state. The button remains fully interactive and
+   keeps the accessible state supplied by ThemeToggle. */
+.landing-page .landing-theme-toggle {
+  display: inline-flex;
+  width: auto !important;
+  min-width: 70px !important;
+  height: 40px !important;
+  align-items: center;
+  justify-content: center;
+  padding: 0 14px !important;
+  border-radius: 10px;
+  font-family: var(--font-product), "Segoe UI", sans-serif;
+}
+
+.landing-page .landing-theme-toggle .theme-switch-icon {
+  display: none !important;
+}
+
+.landing-page .landing-theme-toggle::after {
+  color: currentColor;
+  content: "Theme";
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: -.01em;
+}
+
+@media (max-width: 650px) {
+  .landing-page .landing-theme-toggle {
+    min-width: 62px !important;
+    height: 36px !important;
+    padding: 0 11px !important;
+  }
+
+  .landing-page .landing-theme-toggle::after {
+    font-size: 11px;
+  }
+}
+
+/* Landing-page brand mark: use the supplied artwork directly. The old crop
+   depended on the intrinsic PNG dimensions and could show an inconsistent
+   mark at different desktop widths. */
+.landing-page .landing-brand-mark,
+.landing-page .landing-footer-brand .landing-brand-mark {
+  display: block !important;
+  flex: 0 0 auto;
+  width: 42px !important;
+  height: 42px !important;
+  overflow: hidden !important;
+  border: 0 !important;
+  border-radius: 11px !important;
+  background-color: transparent !important;
+  background-image: url("/duepilot-reference.png") !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
+  background-size: 176% 176% !important;
+  box-shadow: none !important;
+}
+
+.landing-page .landing-brand-mark img,
+.landing-page .landing-footer-brand .landing-brand-mark img {
+  display: none !important;
+}
+
+.landing-page .landing-footer-brand .landing-brand-mark {
+  width: 34px !important;
+  height: 34px !important;
+  border-radius: 9px !important;
+  background-size: 176% 176% !important;
+  box-shadow: none !important;
+}
+
+.landing-page .landing-brand > span:last-child,
+.landing-page .landing-footer-brand > b {
+  display: inline-flex;
+  align-items: baseline;
+  font-family: var(--font-product), "Segoe UI", sans-serif;
+  font-size: 0;
+  font-weight: 850;
+  letter-spacing: -.065em;
+  line-height: 1;
+}
+
+.landing-page .landing-brand {
+  align-items: center;
+}
+
+.landing-page .landing-brand > span:last-child {
+  height: 30px;
+  align-items: baseline;
+  transform: translateY(1px);
+}
+
+.landing-page .landing-brand > span:last-child::before,
+.landing-page .landing-brand > span:last-child::after {
+  font-size: 30px;
+  font-weight: 850;
+}
+
+.landing-page .landing-footer-brand > b::before,
+.landing-page .landing-footer-brand > b::after {
+  font-size: 20px;
+  font-weight: 850;
+}
+
+.landing-page .landing-brand > span:last-child::before,
+.landing-page .landing-footer-brand > b::before {
+  color: #172641;
+  content: "Due";
+}
+
+.landing-page .landing-brand > span:last-child::after,
+.landing-page .landing-footer-brand > b::after {
+  color: #315cdb;
+  content: "Pilot";
+}
+
+/* Final landing navigation treatment: Theme should read like the other
+   navigation links, without a pill, border, shadow, or extra padding. */
+.landing-page .landing-theme-toggle {
+  width: auto !important;
+  min-width: 0 !important;
+  height: 36px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--l-muted) !important;
+}
+
+.landing-page .landing-theme-toggle:hover,
+.landing-page .landing-theme-toggle.is-dark,
+.landing-page .landing-theme-toggle.is-dark:hover {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--l-blue) !important;
+}
+
+html[data-theme="dark"] .landing-page .landing-brand > span:last-child::before,
+html[data-theme="dark"] .landing-page .landing-footer-brand > b::before {
+  color: #edf3ff;
+}
+
+@media (max-width: 650px) {
+  .landing-page .landing-brand-mark {
+    width: 37px !important;
+    height: 37px !important;
+    border-radius: 10px !important;
+  }
+
+  .landing-page .landing-footer-brand .landing-brand-mark {
+    width: 32px !important;
+    height: 32px !important;
+  }
+
+  .landing-page .landing-brand > span:last-child::before,
+  .landing-page .landing-brand > span:last-child::after {
+    font-size: 24px;
+  }
+
+  .landing-page .landing-footer-brand > b::before,
+  .landing-page .landing-footer-brand > b::after {
+    font-size: 18px;
+  }
+}
+
+/* Auth workspace screens use the same branded lockup as the public site. */
+.auth-page .auth-logo {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+}
+
+.auth-page .auth-logo img {
+  display: none !important;
+}
+
+.auth-page .auth-logo::before {
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  border-radius: 11px;
+  background: transparent url("/duepilot-reference.png") center / 176% 176% no-repeat;
+  content: "";
+}
+
+.auth-page .auth-logo::after {
+  color: transparent;
+  background: linear-gradient(90deg, #172641 0 46%, #315cdb 46% 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  content: "DuePilot";
+  font-family: var(--font-product), "Segoe UI", sans-serif;
+  font-size: 26px;
+  font-weight: 850;
+  letter-spacing: -.065em;
+  line-height: 1;
+}
+
+/* Keep Theme as a simple text action on auth pages, matching the public
+   navigation instead of showing a separate icon pill. */
+.auth-page .theme-switch {
+  width: auto !important;
+  min-width: 0 !important;
+  height: 36px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  color: var(--muted) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.auth-page .theme-switch:hover,
+.auth-page .theme-switch.is-dark,
+.auth-page .theme-switch.is-dark:hover {
+  border: 0 !important;
+  color: var(--primary) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.auth-page .theme-switch .theme-switch-icon {
+  display: none !important;
+}
+
+.auth-page .theme-switch::after {
+  content: "Theme";
+  font-size: 13px;
+  font-weight: 750;
+}
+
+/* Bring the workspace form closer to its navigation without changing the
+   split-screen proportions. */
+.auth-page .auth-register-card {
+  margin-top: 24px;
+}
+
+html[data-theme="dark"] .auth-page .auth-logo::after {
+  background: linear-gradient(90deg, #edf3ff 0 46%, #6f8cf4 46% 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+}
+
+@media (max-width: 650px) {
+  .auth-page .auth-logo::before {
+    width: 37px;
+    height: 37px;
+    flex-basis: 37px;
+    border-radius: 10px;
+  }
+
+  .auth-page .auth-logo::after {
+    font-size: 23px;
+  }
+
+  .auth-page .auth-register-card {
+    margin-top: 20px;
+  }
+}
+
+/* The platform console should use the same current brand as the public,
+   auth, demo, and workspace surfaces. */
+.admin-page .admin-brand {
+  gap: 10px;
+}
+
+.admin-page .admin-brand img {
+  display: none !important;
+}
+
+.admin-page .admin-brand::before {
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  border-radius: 11px;
+  background: transparent url("/duepilot-reference.png") center / 176% 176% no-repeat;
+  content: "";
+}
+
+.admin-page .admin-brand::after {
+  color: transparent;
+  background: linear-gradient(90deg, #172641 0 46%, #315cdb 46% 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  content: "DuePilot";
+  font-family: var(--font-product), "Segoe UI", sans-serif;
+  font-size: 25px;
+  font-weight: 850;
+  letter-spacing: -.065em;
+  line-height: 1;
+}
+
+html[data-theme="dark"] .admin-page .admin-brand::after {
+  background: linear-gradient(90deg, #edf3ff 0 46%, #6f8cf4 46% 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+}
+
+@media (max-width: 650px) {
+  .admin-page .admin-brand::before {
+    width: 37px;
+    height: 37px;
+    flex-basis: 37px;
+    border-radius: 10px;
+  }
+
+  .admin-page .admin-brand::after {
+    font-size: 22px;
+  }
+}

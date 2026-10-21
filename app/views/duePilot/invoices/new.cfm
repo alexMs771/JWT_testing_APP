@@ -17,8 +17,8 @@
 		<div class="form-section">
 			<div class="form-section-heading"><h2>Invoice schedule</h2><p>Set the issue and payment due dates.</p></div>
 			<div class="form-grid">
-				<div class="form-group"><label for="issueDate">Issue date</label><input class="form-control" id="issueDate" name="issueDate" type="date" value="#dateFormat( now(), 'yyyy-mm-dd' )#" required></div>
-				<div class="form-group"><label for="dueDate">Due date</label><input class="form-control" id="dueDate" name="dueDate" type="date" value="#dateFormat( dateAdd( 'd', 30, now() ), 'yyyy-mm-dd' )#" required></div>
+				<div class="form-group"><label for="issueDate">Issue date</label><input class="form-control" id="issueDate" name="issueDate" type="date" value="#dateFormat( now(), 'yyyy-MM-dd' )#" required></div>
+				<div class="form-group"><label for="dueDate">Due date</label><input class="form-control" id="dueDate" name="dueDate" type="date" value="#dateFormat( dateAdd( 'd', 30, now() ), 'yyyy-MM-dd' )#" required></div>
 				<div class="form-group full"><label for="description">Description</label><textarea class="form-control" id="description" name="description" minlength="3" maxlength="500" placeholder="Describe the delivered work" required>Professional services</textarea><span class="form-hint">This description is visible to the customer in their secure portal.</span></div>
 			</div>
 		</div>

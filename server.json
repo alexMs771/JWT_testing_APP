@@ -16,7 +16,7 @@
         "webroot":"public",
         "host":"0.0.0.0",
         "http":{
-            "port":"${PORT:8080}"
+            "port":"8088"
         },
         "rewrites":{
             "enable":true
@@ -33,5 +33,6 @@
         "onServerInstall":[
             "install bx-esapi,bx-compat-cfml,bx-ai@3.5.0,bx-postgresql"
         ]
-    }
+    },
+    "help":true
 }

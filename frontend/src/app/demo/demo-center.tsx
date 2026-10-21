@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import "./demo-v2.css";
+import "./demo-brand-polish.css";
 
 type Screen = "home" | "roles" | "personal" | "business" | "customer" | "school" | "parent" | "college" | "student" | "admin" | "reports" | "reconcile" | "ai" | "integrations" | "guide";
 type BillType = "personal" | "business" | "school" | "college";

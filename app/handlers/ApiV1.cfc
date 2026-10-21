@@ -11,6 +11,7 @@ component extends="coldbox.system.EventHandler" {
     property name="duePilotService" inject="DuePilotService";
     property name="duePilotAiService" inject="DuePilotAiService";
     property name="tokenManager" inject="TokenManager@cf-token-manager";
+    property name="subscriptionService" inject="SubscriptionService";
 
     function health(event, rc, prc) {
         return success(
@@ -58,12 +59,9 @@ component extends="coldbox.system.EventHandler" {
         }
 
         var account = authentication.user;
-        startSession(account);
+        var accessToken = startSession(account);
 
-        return success(
-            event,
-            {user: account, workspace: duePilotService.getOrganization(), csrfToken: session.csrfToken}
-        );
+        return success(event, sessionPayload(accessToken));
     }
 
     function refreshToken(event, rc, prc) {
@@ -89,17 +87,31 @@ component extends="coldbox.system.EventHandler" {
             );
         }
 
+        // Re-read the server-side entitlement before rotating the access
+        // token. This is important for the short-lived subscription test:
+        // an expired Plus/Pro record must produce a free claim immediately,
+        // even when the refresh token itself is still valid.
+        session.user = subscriptionService.enrichAccount(session.user);
         var result = tokenManager.refresh(session.tokens.refreshToken);
-        lock scope="session" type="exclusive" timeout="5" {
-            session.tokens.accessToken = result.accessToken;
+        var refreshedClaims = tokenManager.decode(result.accessToken);
+        var currentClaims = buildTokenSubject(session.user);
+        var accessToken = result.accessToken;
+        if ((refreshedClaims.plan ?: 'free') != (currentClaims.plan ?: 'free') || (refreshedClaims.subscriptionStatus ?: '') != (currentClaims.subscriptionStatus ?: '')) {
+            // Keep the package refresh() call in the flow, but issue a fresh
+            // pair when server-side entitlements changed so both JWTs carry
+            // the current signed RBAC/plan snapshot.
+            var refreshedPair = tokenManager.issue(currentClaims);
+            session.tokens.refreshToken = refreshedPair.refreshToken;
+            accessToken = refreshedPair.accessToken;
         }
 
-        var accessClaims = tokenManager.decode(result.accessToken);
+        var accessClaims = tokenManager.decode(accessToken);
         var refreshClaims = tokenManager.decode(session.tokens.refreshToken);
         return success(
             event,
             {
                 refreshed: true,
+                accessToken: accessToken,
                 accessIn: accessClaims.exp - epochSeconds(),
                 refreshIn: refreshClaims.exp - epochSeconds()
             }
@@ -109,7 +121,7 @@ component extends="coldbox.system.EventHandler" {
     function permissions(event, rc, prc) {
         if (!requireMethod(event, 'GET') || !requireAuthentication(event)) return request.duePilotApiResponse;
 
-        var accessToken = session.tokens.accessToken;
+        var accessToken = request.authAccessToken ?: bearerAccessToken();
         var claims = tokenManager.decode(accessToken);
         var role = lCase(trim(claims.role ?: session.user.role ?: ''));
         var roleChecks = {
@@ -133,7 +145,11 @@ component extends="coldbox.system.EventHandler" {
                     valid: platformAuthorization.valid,
                     authorized: platformAuthorization.authorized,
                     code: platformAuthorization.code
-                }
+                },
+                plan: claims.plan ?: "free",
+                subscriptionStatus: claims.subscriptionStatus ?: "active",
+                subscriptionExpiresAt: claims.subscriptionExpiresAt ?: "",
+                entitlements: claims.entitlements ?: {}
             }
         );
     }
@@ -153,13 +169,8 @@ component extends="coldbox.system.EventHandler" {
                 email = rc.email,
                 password = rc.password
             );
-            startSession(registration.user);
-            return success(
-                event,
-                {user: registration.user, workspace: duePilotService.getOrganization(), csrfToken: session.csrfToken},
-                {},
-                201
-            );
+            var accessToken = startSession(registration.user);
+            return success(event, sessionPayload(accessToken), {}, 201);
         } catch (any error) {
             return failureForError(event, 422, 'REGISTRATION_VALIDATION_FAILED', error);
         }
@@ -168,19 +179,84 @@ component extends="coldbox.system.EventHandler" {
     function me(event, rc, prc) {
         if (!requireMethod(event, 'GET')) return request.duePilotApiResponse;
         if (!requireAuthentication(event)) return request.duePilotApiResponse;
-        return success(
-            event,
-            {
-                user: duplicate(session.user),
-                workspace: duePilotService.getOrganization(),
-                csrfToken: session.csrfToken ?: ''
-            }
-        );
+        return success(event, sessionPayload(request.authAccessToken ?: bearerAccessToken()));
     }
 
     function workspaceContext(event, rc, prc) {
         if (!requireMethod(event, 'GET') || !requireAuthentication(event)) return request.duePilotApiResponse;
-        return success(event, duePilotService.getWorkspaceContext());
+        try {
+            var context = duePilotService.getWorkspaceContext();
+            context.access = subscriptionService.getAccessContext(session.user);
+            context.plans = subscriptionService.planCatalog();
+            return success(event, context);
+        } catch (any error) {
+            return failureForError(event, 503, 'WORKSPACE_CONTEXT_UNAVAILABLE', error);
+        }
+    }
+
+    function subscription(event, rc, prc) {
+        // GET is the canonical method for this read-only resource. Accept a
+        // legacy POST from already-open frontend tabs as a compatibility
+        // measure; it has no side effects and prevents an old client bundle
+        // from displaying a misleading method error after a deployment.
+        var subscriptionMethod = uCase(cgi.request_method ?: 'GET');
+        if (subscriptionMethod != 'GET' && subscriptionMethod != 'POST') {
+            arguments.event.setHTTPHeader(name = 'Allow', value = 'GET, POST');
+            return failure(event, 405, 'METHOD_NOT_ALLOWED', 'This endpoint supports GET and POST.');
+        }
+        if (!requireAuthentication(event)) return request.duePilotApiResponse;
+        try {
+            return success(event, {current: subscriptionService.getAccessContext(session.user), plans: subscriptionService.planCatalog()});
+        } catch (any error) {
+            // Keep database/migration failures inside the API envelope. The
+            // frontend can then show a useful recovery message instead of
+            // treating an HTML/error-stream response as unreadable JSON.
+            return failureForError(event, 503, 'SUBSCRIPTION_SERVICE_UNAVAILABLE', error);
+        }
+    }
+
+    function subscribe(event, rc, prc) {
+        if (!requireMethod(event, 'POST') || !requireAuthentication(event)) return request.duePilotApiResponse;
+        param rc.plan = '';
+        try {
+            var access = subscriptionService.subscribe(session.user, rc.plan);
+            session.user = subscriptionService.enrichAccount(session.user);
+            var subscriptionPair = tokenManager.issue(buildTokenSubject(session.user));
+            session.tokens = {refreshToken: subscriptionPair.refreshToken};
+            return success(event, {subscription: access, session: sessionPayload(subscriptionPair.accessToken)});
+        } catch (any error) {
+            return failureForError(event, 422, 'SUBSCRIPTION_FAILED', error);
+        }
+    }
+
+    function workspaces(event, rc, prc) {
+        if (!requireAuthentication(event)) return request.duePilotApiResponse;
+        var method = uCase(cgi.request_method ?: 'GET');
+        if (method == 'GET') return success(event, {items: subscriptionService.listWorkspaces(session.user), access: subscriptionService.getAccessContext(session.user)});
+        if (method != 'POST') return failure(event, 405, 'METHOD_NOT_ALLOWED', 'This endpoint supports GET and POST.');
+        param rc.name = '';
+        param rc.organizationType = 'business';
+        try {
+            return success(event, subscriptionService.createChildWorkspace(session.user, rc.name, rc.organizationType), {}, 201);
+        } catch (any error) {
+            return failureForError(event, 422, 'WORKSPACE_CREATE_FAILED', error);
+        }
+    }
+
+    function workspaceUnits(event, rc, prc) {
+        if (!requireAuthentication(event)) return request.duePilotApiResponse;
+        var method = uCase(cgi.request_method ?: 'GET');
+        if (method == 'GET') return success(event, {items: subscriptionService.listWorkspaceUnits(session.user), access: subscriptionService.getAccessContext(session.user)});
+        if (method != 'POST') return failure(event, 405, 'METHOD_NOT_ALLOWED', 'This endpoint supports GET and POST.');
+        param rc.name = '';
+        param rc.unitType = 'department';
+        param rc.parentUnitId = '';
+        param rc.code = '';
+        try {
+            return success(event, subscriptionService.createWorkspaceUnit(session.user, rc.name, rc.unitType, rc.parentUnitId, rc.code), {}, 201);
+        } catch (any error) {
+            return failureForError(event, 422, 'WORKSPACE_UNIT_CREATE_FAILED', error);
+        }
     }
 
     function personalSummary(event, rc, prc) {
@@ -204,7 +280,6 @@ component extends="coldbox.system.EventHandler" {
         try { summary = duePilotService.getPersonalSummary(); } catch (any error) { return failure(event, 422, 'PERSONAL_PROFILE_UNAVAILABLE', error.message); }
         if (method == 'GET') return success(event, summary.profile);
         if (method != 'POST') return failure(event, 405, 'METHOD_NOT_ALLOWED', 'This endpoint supports GET and POST.');
-        if (!requireCsrf(event)) return request.duePilotApiResponse;
         param rc.displayName = session.user.name ?: '';
         param rc.mobile = '';
         try {
@@ -221,7 +296,6 @@ component extends="coldbox.system.EventHandler" {
         try {
             if (method == 'GET') return success(event, duePilotService.getPersonalSummary().obligations);
             if (method != 'POST') return failure(event, 405, 'METHOD_NOT_ALLOWED', 'This endpoint supports GET and POST.');
-            if (!requireCsrf(event)) return request.duePilotApiResponse;
             param rc.providerName = '';
             param rc.category = 'other';
             param rc.title = '';
@@ -248,12 +322,11 @@ component extends="coldbox.system.EventHandler" {
 
     function logout(event, rc, prc) {
         if (!requireMethod(event, 'POST')) return request.duePilotApiResponse;
-        if (!requireAuthentication(event) || !requireCsrf(event)) return request.duePilotApiResponse;
+        if (!requireAuthentication(event)) return request.duePilotApiResponse;
         lock scope="session" type="exclusive" timeout="5" {
             authService.logLogout(session.user.id, session.user.email);
             structDelete(session, 'user');
             structDelete(session, 'tokens');
-            structDelete(session, 'csrfToken');
         }
         return success(event, {signedOut: true});
     }
@@ -269,7 +342,6 @@ component extends="coldbox.system.EventHandler" {
                 'METHOD_NOT_ALLOWED',
                 'This endpoint supports GET and POST.'
             );
-        if (!requireCsrf(event)) return request.duePilotApiResponse;
         param rc.name = '';
         try {
             var profile = authService.updateProfile(session.user.id, rc.name);
@@ -282,7 +354,7 @@ component extends="coldbox.system.EventHandler" {
     }
 
     function saveProfilePhoto(event, rc, prc) {
-        if (!requireMethod(event, 'POST') || !requireAuthentication(event) || !requireCsrf(event))
+        if (!requireMethod(event, 'POST') || !requireAuthentication(event))
             return request.duePilotApiResponse;
         param rc.contentType = '';
         param rc.imageBase64 = '';
@@ -294,13 +366,13 @@ component extends="coldbox.system.EventHandler" {
     }
 
     function removeProfilePhoto(event, rc, prc) {
-        if (!requireMethod(event, 'POST') || !requireAuthentication(event) || !requireCsrf(event))
+        if (!requireMethod(event, 'POST') || !requireAuthentication(event))
             return request.duePilotApiResponse;
         return success(event, authService.removeProfilePhoto(session.user.id));
     }
 
     function deleteWorkspace(event, rc, prc) {
-        if (!requireMethod(event, 'POST') || !requireAuthentication(event) || !requireCsrf(event))
+        if (!requireMethod(event, 'POST') || !requireAuthentication(event))
             return request.duePilotApiResponse;
         param rc.confirmation = '';
         try {
@@ -320,7 +392,7 @@ component extends="coldbox.system.EventHandler" {
     }
 
     function adminDeleteWorkspace(event, rc, prc) {
-        if (!requireMethod(event, 'POST') || !requirePlatformAdmin(event) || !requireCsrf(event))
+        if (!requireMethod(event, 'POST') || !requirePlatformAdmin(event))
             return request.duePilotApiResponse;
         try {
             authService.adminDeleteWorkspace(rc.workspaceId ?: '', session.user.id);
@@ -333,14 +405,15 @@ component extends="coldbox.system.EventHandler" {
     function dashboard(event, rc, prc) {
         if (!requireMethod(event, 'GET')) return request.duePilotApiResponse;
         if (!requireAuthentication(event)) return request.duePilotApiResponse;
-        return success(event, duePilotService.getDashboard());
+        var dashboardData = duePilotService.getDashboard();
+        dashboardData.organization.plan = subscriptionService.getAccessContext(session.user).plan;
+        return success(event, dashboardData);
     }
 
     function invoices(event, rc, prc) {
         if (!requireAuthentication(event)) return request.duePilotApiResponse;
         var method = uCase(cgi.request_method ?: 'GET');
         if (method == 'POST') {
-            if (!requireCsrf(event)) return request.duePilotApiResponse;
             param rc.customerId = '';
             param rc.amount = 0;
             param rc.issueDate = '';
@@ -381,7 +454,7 @@ component extends="coldbox.system.EventHandler" {
 
     function recordPayment(event, rc, prc) {
         if (!requireMethod(event, 'POST')) return request.duePilotApiResponse;
-        if (!requireAuthentication(event) || !requireCsrf(event)) return request.duePilotApiResponse;
+        if (!requireAuthentication(event)) return request.duePilotApiResponse;
         param rc.amount = 0;
         param rc.reference = '';
         try {
@@ -393,7 +466,7 @@ component extends="coldbox.system.EventHandler" {
 
     function savePromise(event, rc, prc) {
         if (!requireMethod(event, 'POST')) return request.duePilotApiResponse;
-        if (!requireAuthentication(event) || !requireCsrf(event)) return request.duePilotApiResponse;
+        if (!requireAuthentication(event)) return request.duePilotApiResponse;
         param rc.promiseDate = '';
         param rc.note = '';
         try {
@@ -405,7 +478,7 @@ component extends="coldbox.system.EventHandler" {
 
     function openDispute(event, rc, prc) {
         if (!requireMethod(event, 'POST')) return request.duePilotApiResponse;
-        if (!requireAuthentication(event) || !requireCsrf(event)) return request.duePilotApiResponse;
+        if (!requireAuthentication(event)) return request.duePilotApiResponse;
         param rc.reason = '';
         try {
             return success(event, duePilotService.openDispute(rc.invoiceId ?: '', rc.reason));
@@ -416,7 +489,7 @@ component extends="coldbox.system.EventHandler" {
 
     function sendReminder(event, rc, prc) {
         if (!requireMethod(event, 'POST')) return request.duePilotApiResponse;
-        if (!requireAuthentication(event) || !requireCsrf(event)) return request.duePilotApiResponse;
+        if (!requireAuthentication(event)) return request.duePilotApiResponse;
         param rc.channel = 'email';
         try {
             return success(event, duePilotService.sendReminder(rc.invoiceId ?: '', rc.channel));
@@ -444,7 +517,6 @@ component extends="coldbox.system.EventHandler" {
         if (!requireAuthentication(event)) return request.duePilotApiResponse;
         var method = uCase(cgi.request_method ?: 'GET');
         if (method == 'POST') {
-            if (!requireCsrf(event)) return request.duePilotApiResponse;
             param rc.name = '';
             param rc.contactName = '';
             param rc.email = '';
@@ -481,7 +553,11 @@ component extends="coldbox.system.EventHandler" {
     function settings(event, rc, prc) {
         if (!requireAuthentication(event)) return request.duePilotApiResponse;
         var method = uCase(cgi.request_method ?: 'GET');
-        if (method == 'GET') return success(event, duePilotService.getOrganization());
+        if (method == 'GET') {
+            var organization = duePilotService.getOrganization();
+            organization.plan = subscriptionService.getAccessContext(session.user).plan;
+            return success(event, organization);
+        }
         if (method != 'POST') {
             event.setHTTPHeader(name = 'Allow', value = 'GET, POST');
             return failure(
@@ -491,20 +567,21 @@ component extends="coldbox.system.EventHandler" {
                 'This endpoint supports GET and POST.'
             );
         }
-        if (!requireCsrf(event)) return request.duePilotApiResponse;
         param rc.name = '';
         param rc.currency = 'INR';
         param rc.financeEmail = '';
         param rc.defaultTerms = 30;
         try {
+            var updatedOrganization = duePilotService.updateOrganization(
+                name = rc.name,
+                currency = rc.currency,
+                financeEmail = rc.financeEmail,
+                defaultTerms = val(rc.defaultTerms)
+            );
+            updatedOrganization.plan = subscriptionService.getAccessContext(session.user).plan;
             return success(
                 event,
-                duePilotService.updateOrganization(
-                    name = rc.name,
-                    currency = rc.currency,
-                    financeEmail = rc.financeEmail,
-                    defaultTerms = val(rc.defaultTerms)
-                )
+                updatedOrganization
             );
         } catch (any error) {
             return failureForError(event, 422, 'WORKSPACE_VALIDATION_FAILED', error);
@@ -514,12 +591,14 @@ component extends="coldbox.system.EventHandler" {
     function assistantStatus(event, rc, prc) {
         if (!requireMethod(event, 'GET')) return request.duePilotApiResponse;
         if (!requireAuthentication(event)) return request.duePilotApiResponse;
-        return success(event, duePilotAiService.getStatus());
+        var status = duePilotAiService.getStatus();
+        status.access = subscriptionService.getAccessContext(session.user);
+        return success(event, status);
     }
 
     function assistantChat(event, rc, prc) {
         if (!requireMethod(event, 'POST')) return request.duePilotApiResponse;
-        if (!requireAuthentication(event) || !requireCsrf(event)) return request.duePilotApiResponse;
+        if (!requireAuthentication(event)) return request.duePilotApiResponse;
         param rc.message = '';
         if (!isSimpleValue(rc.message) || !len(trim(rc.message)) || len(trim(rc.message)) > 2000) {
             return failure(
@@ -538,20 +617,29 @@ component extends="coldbox.system.EventHandler" {
             );
         }
         try {
+            var aiAccess = subscriptionService.reserveAiRequest(session.user);
+            var requestHistory = structKeyExists(rc, 'history') && isArray(rc.history) ? rc.history : [];
+            var requestContext = structKeyExists(rc, 'context') && isStruct(rc.context) ? rc.context : {};
             var result = duePilotAiService.chat(
                 message = rc.message,
-                history = isArray(rc.history ?: []) ? rc.history : [],
-                pageContext = isStruct(rc.context ?: {}) ? rc.context : {}
+                history = requestHistory,
+                pageContext = requestContext
             );
             structDelete(result, 'ok');
+            result.usage = aiAccess.usage;
+            result.plan = aiAccess.plan;
             return success(event, result);
         } catch (any error) {
-            return failure(
-                event,
-                503,
-                'AI_UNAVAILABLE',
-                error.message
+            if (findNoCase('aiquotaexceeded', lCase(toString(error.type ?: '')))) {
+                return failure(event, 429, 'AI_QUOTA_EXCEEDED', error.message);
+            }
+            writeLog(
+                text = 'assistantChat failed: type=' & toString(error.type ?: 'Unknown') &
+                    ' message=' & toString(error.message ?: 'Unknown error'),
+                type = 'error',
+                log = 'application'
             );
+            return failure(event, 503, 'AI_UNAVAILABLE', error.message);
         }
     }
 
@@ -566,9 +654,19 @@ component extends="coldbox.system.EventHandler" {
             return false;
         }
 
-        var diagnosis = tokenManager.diagnose(session.tokens.accessToken ?: '', 'access');
+        var accessToken = bearerAccessToken();
+        if (!len(accessToken)) {
+            failure(
+                arguments.event,
+                401,
+                'AUTHENTICATION_REQUIRED',
+                'Send a valid bearer access token.'
+            );
+            return false;
+        }
+
+        var diagnosis = tokenManager.diagnose(accessToken, 'access');
         if (!diagnosis.valid) {
-            clearAuthenticationSession();
             failure(
                 arguments.event,
                 401,
@@ -579,14 +677,23 @@ component extends="coldbox.system.EventHandler" {
             return false;
         }
 
+        session.user = subscriptionService.enrichAccount(session.user);
+        var trustedClaims = tokenManager.decode(accessToken);
+        request.authAccessToken = accessToken;
+        if ((trustedClaims.plan ?: 'free') != session.user.plan || (trustedClaims.subscriptionStatus ?: '') != session.user.subscriptionStatus) {
+            var rotatedPair = tokenManager.issue(buildTokenSubject(session.user));
+            session.tokens = {refreshToken: rotatedPair.refreshToken};
+            request.authAccessToken = rotatedPair.accessToken;
+            arguments.event.setHTTPHeader(name = 'X-New-Access-Token', value = rotatedPair.accessToken);
+        }
         return true;
     }
 
     private boolean function requirePlatformAdmin(required any event) {
         if (!requireAuthentication(arguments.event)) return false;
-        var diagnosis = tokenManager.diagnoseAuthorization(session.tokens.accessToken, 'platform_admin');
+        var accessToken = request.authAccessToken ?: bearerAccessToken();
+        var diagnosis = tokenManager.diagnoseAuthorization(accessToken, 'platform_admin');
         if (!diagnosis.valid) {
-            clearAuthenticationSession();
             failure(
                 arguments.event,
                 401,
@@ -608,12 +715,15 @@ component extends="coldbox.system.EventHandler" {
         return true;
     }
 
-    private void function startSession(required struct account) {
+    private string function startSession(required struct account) {
+        var accessToken = '';
         lock scope="session" type="exclusive" timeout="5" {
-            session.user = arguments.account;
-            session.tokens = tokenManager.issue(buildTokenSubject(arguments.account));
-            session.csrfToken = hash(createUUID() & getTickCount(), 'SHA-256');
+            session.user = subscriptionService.enrichAccount(arguments.account);
+            var pair = tokenManager.issue(buildTokenSubject(session.user));
+            session.tokens = {refreshToken: pair.refreshToken};
+            accessToken = pair.accessToken;
         }
+        return accessToken;
     }
 
     private struct function buildTokenSubject(required struct account) {
@@ -625,7 +735,28 @@ component extends="coldbox.system.EventHandler" {
             id: arguments.account.id,
             role: arguments.account.role,
             roles: roles,
-            email: arguments.account.email
+            email: arguments.account.email,
+            workspaceId: arguments.account.workspaceId ?: '',
+            plan: arguments.account.plan ?: 'free',
+            subscriptionStatus: arguments.account.subscriptionStatus ?: 'active',
+            subscriptionExpiresAt: arguments.account.subscriptionExpiresAt ?: '',
+            entitlements: arguments.account.entitlements ?: {}
+        };
+    }
+
+    private struct function sessionPayload(string accessToken = '') {
+        var access = subscriptionService.getAccessContext(session.user);
+        var workspace = duePilotService.getOrganization();
+        workspace.plan = access.plan;
+        var currentAccessToken = arguments.accessToken;
+        if (!len(currentAccessToken) && structKeyExists(request, 'authAccessToken')) {
+            currentAccessToken = request.authAccessToken;
+        }
+        return {
+            user: duplicate(session.user),
+            workspace: workspace,
+            accessToken: currentAccessToken,
+            access: access
         };
     }
 
@@ -641,7 +772,6 @@ component extends="coldbox.system.EventHandler" {
         lock scope="session" type="exclusive" timeout="5" {
             structDelete(session, 'user');
             structDelete(session, 'tokens');
-            structDelete(session, 'csrfToken');
         }
     }
 
@@ -651,7 +781,8 @@ component extends="coldbox.system.EventHandler" {
 
     private boolean function consumeAssistantRateLimit() {
         var allowed = true;
-        var lockKey = 'duepilot-api-ai-rate-' & hash(session.csrfToken);
+        var rateIdentity = session.user.id ?: session.user.email ?: 'anonymous';
+        var lockKey = 'duepilot-api-ai-rate-' & hash(toString(rateIdentity));
         lock name=lockKey type="exclusive" timeout="3" {
             if (
                 !structKeyExists(session, 'aiApiRateLimit') || dateDiff('s', session.aiApiRateLimit.startedAt, now()) >= 60
@@ -667,22 +798,10 @@ component extends="coldbox.system.EventHandler" {
         return allowed;
     }
 
-    private boolean function requireCsrf(required any event) {
-        var providedToken = cgi.http_x_csrf_token ?: '';
-        if (
-            structKeyExists(session, 'csrfToken')
-            && len(providedToken)
-            && providedToken == session.csrfToken
-        ) {
-            return true;
-        }
-        failure(
-            arguments.event,
-            403,
-            'CSRF_VALIDATION_FAILED',
-            'Your request expired. Refresh the page and try again.'
-        );
-        return false;
+    private string function bearerAccessToken() {
+        var authorization = trim(toString(cgi.http_authorization ?: ''));
+        if (!reFindNoCase('^Bearer\s+', authorization)) return '';
+        return trim(reReplaceNoCase(authorization, '^Bearer\s+', ''));
     }
 
     private boolean function requireMethod(required any event, required string method) {
@@ -709,7 +828,7 @@ component extends="coldbox.system.EventHandler" {
             errorType = lCase(toString(arguments.error.type));
         }
         if (findNoCase('notfound', errorType)) return 404;
-        if (findNoCase('forbidden', errorType)) return 403;
+        if (findNoCase('forbidden', errorType) || findNoCase('planlimit', errorType)) return 403;
         if (
             findNoCase('duplicate', errorType)
             || findNoCase('emailinuse', errorType)
@@ -743,7 +862,7 @@ component extends="coldbox.system.EventHandler" {
         var responseMeta = duplicate(arguments.meta);
         responseMeta.apiVersion = 'v1';
         responseMeta.requestId = createUUID();
-        responseMeta.timestamp = dateTimeFormat(dateConvert('local2utc', now()), 'yyyy-mm-dd''T''HH:nn:ss''Z''');
+        responseMeta.timestamp = dateTimeFormat(dateConvert('local2utc', now()), 'yyyy-MM-dd''T''HH:nn:ss''Z''');
         arguments.event.setHTTPHeader(statusCode = arguments.statusCode);
         arguments.event.setHTTPHeader(name = 'Content-Type', value = 'application/json; charset=utf-8');
         arguments.event.setHTTPHeader(name = 'Cache-Control', value = 'no-store');
@@ -792,7 +911,7 @@ component extends="coldbox.system.EventHandler" {
 
         var canonicalNames = listToArray(
             'ok,data,meta,error,code,message,details,apiVersion,requestId,timestamp,' &
-            'service,version,status,persistence,signedOut,user,workspace,workspaceId,csrfToken,' &
+            'service,version,status,persistence,signedOut,user,workspace,workspaceId,accessToken,' &
             'id,name,email,role,initials,isPlatformAdmin,plan,currency,financeEmail,defaultTerms,' &
             'organization,outstanding,overdueAmount,overdueCount,dueSoonAmount,' &
             'disputedAmount,collectedAmount,collectionRate,customerCount,' &

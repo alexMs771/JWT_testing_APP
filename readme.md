@@ -7,6 +7,9 @@ Version 1 runs in **demo mode by default**. It includes realistic seeded data an
 ## Included in version 1
 
 - JWT-backed sign-in and session lifecycle using `cf-token-manager`
+- Role-aware workspace access with separate Free / Plus / Pro entitlements
+- Server-side annual subscriptions, AI quotas and nested-workspace limits
+- Token-manager entitlement lab: 5-minute Free, 2-minute Plus and 3-minute Pro demo TTLs
 - Receivables dashboard with aging, collection rate and cash forecast
 - Invoice search, status filters, detail pages and invoice creation
 - Payment recording, reminders, payment promises and disputes
@@ -14,7 +17,7 @@ Version 1 runs in **demo mode by default**. It includes realistic seeded data an
 - Prioritized collection queue
 - Collection and aging reports
 - Public customer payment portal with demo UPI checkout
-- CSRF protection on all state-changing forms
+- Short-lived JWT bearer access tokens with server-held refresh sessions for the Next.js API
 - Responsive product UI for desktop, tablet and mobile
 - Persistent light/dark/system theme with accessible controls
 - DuePilot AI receivables copilot with guided offline mode and Groq live mode
@@ -73,7 +76,7 @@ GROQ_TIMEOUT_SECONDS=12
 GROQ_MAX_TOKENS=700
 ```
 
-The assistant is read-only in version 1. It can recommend a workflow but cannot send reminders, change invoices or record payments. Requests require an authenticated session and CSRF token, are limited to 2,000 characters and are rate-limited to 10 per minute per session. Provider failures fall back to guided mode without exposing provider errors or secrets.
+The assistant is read-only in version 1. It can recommend a workflow but cannot send reminders, change invoices or record payments. Requests require a valid JWT bearer access token, are limited to 2,000 characters and are rate-limited to 10 per minute per session. Provider failures fall back to guided mode without exposing provider errors or secrets.
 
 ## Application structure
 
@@ -82,6 +85,7 @@ app/
   handlers/AiAssistant.cfc       Authenticated assistant JSON API
   handlers/DuePilot.cfc         Product request workflows
   models/DuePilotAiService.cfc  Groq/BoxLang AI integration and safe fallback
+  models/SubscriptionService.cfc Server-side plans, quotas and nested workspaces
   models/DuePilotService.cfc    Receivables domain and demo repository
   views/duePilot/               Product and customer portal screens
   layouts/                      Auth, application and portal shells
@@ -95,14 +99,20 @@ Only `public/` is web-accessible. The ColdBox application, JWT module and busine
 
 The current release uses `DATA_MODE=demo`. Data lives in application memory and resets when the application restarts. You can also restore it manually from **Settings → Reset demo workspace**.
 
-For persistent customer data:
+For persistent customer data and plan-aware authorization:
 
-1. Start MySQL with `docker compose --env-file .env -f docker/docker-compose.yml up -d database` or create a MySQL 8 database.
-2. Apply [`resources/database/schema/mysql.sql`](resources/database/schema/mysql.sql).
-3. Copy `.env.example` to `.env` and set the `DB_*` values.
-4. Implement the SQL repository behind the existing `DuePilotService` interface, then set `DATA_MODE=mysql`.
+1. Start PostgreSQL with `docker compose --env-file .env -f docker/docker-compose.yml up -d postgres`.
+2. New databases apply migrations `001` through `004`; an existing volume must apply [`database/migrations/004_subscriptions_and_nested_workspaces.sql`](database/migrations/004_subscriptions_and_nested_workspaces.sql) once.
+3. Copy `.env.example` to `.env`, set the `DB_*` values and use `DATA_MODE=postgres`.
+4. Start the backend and frontend. Registration creates the user's root workspace on the Free plan.
 
-The schema already covers organizations, users, customers, invoices, payments, promises, disputes, reminders and the activity audit trail. Do not store real customer or payment data in demo mode.
+The schema covers users, tenant workspaces, member roles, invoices, payments, promises, disputes, reminders, AI usage, subscriptions and the activity audit trail. Do not store real customer or payment data in demo mode.
+
+### Plan and RBAC rules
+
+`owner`, `admin`, `manager`, `finance` and `member` are identity roles. `free`, `plus` and `pro` are workspace entitlements. A subscription never silently changes a user's identity role. The signed access token includes a plan snapshot, but every protected API request re-checks the current subscription in PostgreSQL and rotates stale claims. Plus and Pro may create nested workspaces; Free cannot. Plus has a monthly guided-AI quota, while Pro has no monthly quota (the per-minute abuse guard still applies).
+
+The billing screen currently uses an internal test activation so the workflow can be demonstrated without a payment provider. Before charging customers, replace that endpoint with verified Razorpay/Stripe/Cashfree webhook processing and keep the entitlement service as the single authorization boundary.
 
 ## Security and external integrations
 
@@ -140,7 +150,7 @@ For a production-like local Docker run from the project root:
 docker compose --env-file .env -f docker/docker-compose.yml up --build
 ```
 
-The compose stack builds the same Dockerfile used by Render, waits for MySQL health, caps the app container at 512 MB and exposes DuePilot at <http://127.0.0.1:8080>. The `.dockerignore` explicitly excludes `.env`, so the Groq and JWT secrets are injected at runtime instead of being copied into the image.
+The compose stack builds the same Dockerfile used by Render, waits for PostgreSQL health, caps the app container at 512 MB and exposes DuePilot at <http://127.0.0.1:8080>. The `.dockerignore` explicitly excludes `.env`, so the Groq and JWT secrets are injected at runtime instead of being copied into the image.
 
 On Render, add `GROQ_API_KEY` and any optional `GROQ_API_KEY_2` through `GROQ_API_KEY_4` values under **Service → Environment** as secret values, then redeploy. `render.yaml` contains the non-secret AI defaults and deliberately leaves every key unsynchronized.
 

@@ -1,0 +1,12 @@
+{
+    "app":{
+        "cfengine":"boxlang@1.18.6"
+    },
+    "name":"duepilot-memory-test",
+    "web":{
+        "http":{
+            "port":"8088"
+        }
+    },
+    "webroot":"public"
+}

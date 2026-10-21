@@ -46,8 +46,8 @@ component extends="coldbox.system.EventHandler" {
 		if ( !protectMutation( event, rc ) ) return;
 		param rc.customerId = "";
 		param rc.amount = 0;
-		param rc.issueDate = dateFormat( now(), "yyyy-mm-dd" );
-		param rc.dueDate = dateFormat( dateAdd( "d", 30, now() ), "yyyy-mm-dd" );
+		param rc.issueDate = dateFormat( now(), "yyyy-MM-dd" );
+		param rc.dueDate = dateFormat( dateAdd( "d", 30, now() ), "yyyy-MM-dd" );
 		param rc.purchaseOrder = "";
 		param rc.description = "Professional services";
 

@@ -30,8 +30,8 @@ component extends="coldbox.system.testing.BaseTestCase" appMapping="/app" {
 				var invoice = variables.duePilot.createInvoice(
 					customerId = "cus-atlas",
 					amount     = 125000,
-					issueDate  = dateFormat( now(), "yyyy-mm-dd" ),
-					dueDate    = dateFormat( dateAdd( "d", 30, now() ), "yyyy-mm-dd" ),
+					issueDate  = dateFormat( now(), "yyyy-MM-dd" ),
+					dueDate    = dateFormat( dateAdd( "d", 30, now() ), "yyyy-MM-dd" ),
 					description = "Test invoice"
 				);
 				var portalInvoice = variables.duePilot.getInvoiceByPortalToken( invoice.portalToken );
@@ -40,7 +40,7 @@ component extends="coldbox.system.testing.BaseTestCase" appMapping="/app" {
 			} );
 
 			it( "moves an invoice through promise, dispute and payment", function(){
-				variables.duePilot.savePromise( "inv-1047", dateFormat( dateAdd( "d", 5, now() ), "yyyy-mm-dd" ), "Confirmed" );
+				variables.duePilot.savePromise( "inv-1047", dateFormat( dateAdd( "d", 5, now() ), "yyyy-MM-dd" ), "Confirmed" );
 				expect( variables.duePilot.getInvoice( "inv-1047" ).promiseDate ).notToBeEmpty();
 
 				variables.duePilot.openDispute( "inv-1047", "Purchase order mismatch" );
@@ -59,8 +59,8 @@ component extends="coldbox.system.testing.BaseTestCase" appMapping="/app" {
 					variables.duePilot.createInvoice(
 						customerId = "cus-atlas",
 						amount = 125000,
-						issueDate = dateFormat( now(), "yyyy-mm-dd" ),
-						dueDate = dateFormat( dateAdd( "d", -1, now() ), "yyyy-mm-dd" ),
+						issueDate = dateFormat( now(), "yyyy-MM-dd" ),
+						dueDate = dateFormat( dateAdd( "d", -1, now() ), "yyyy-MM-dd" ),
 						description = "Invalid date range"
 					);
 				} catch ( any error ) {
@@ -97,9 +97,15 @@ component extends="coldbox.system.testing.BaseTestCase" appMapping="/app" {
 			it( "builds a minimal AI context without customer secrets", function(){
 				var context = variables.duePilot.getAssistantContext();
 				expect( context.summary.outstanding ).toBeGT( 0 );
+				expect( context.workspace.name ).toBe( "Northstar Digital" );
+				expect( context.workspace.sector ).toBeStruct();
 				expect( context.priorities ).notToBeEmpty();
+				expect( context.openInvoices ).notToBeEmpty();
+				expect( context.customers ).notToBeEmpty();
+				expect( context.activity ).notToBeEmpty();
 				expect( structKeyExists( context.priorities[ 1 ], "portalToken" ) ).toBeFalse();
 				expect( structKeyExists( context.priorities[ 1 ], "customerEmail" ) ).toBeFalse();
+				expect( structKeyExists( context.openInvoices[ 1 ], "portalToken" ) ).toBeFalse();
 			} );
 
 			it( "provides useful guided AI responses before a Groq key is added", function(){

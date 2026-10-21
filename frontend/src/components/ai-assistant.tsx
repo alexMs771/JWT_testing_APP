@@ -11,6 +11,10 @@ type ChatMessage = {
   content: string;
   evidence?: AssistantAnswer["evidence"];
   nextActions?: string[];
+  retrievalMode?: string;
+  retrievedCount?: number;
+  confidence?: number;
+  grounded?: boolean;
 };
 
 export function AiAssistant({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -41,9 +45,22 @@ export function AiAssistant({ open, onClose }: { open: boolean; onClose: () => v
     setMessages((previous) => [...previous, { role: "user", content: cleanMessage }]);
     setPending(true);
     setError("");
-    const result = await apiMutation<AssistantAnswer>("/assistant/chat", { message: cleanMessage, history, context: { page: pathname } });
+    const result = await apiMutation<AssistantAnswer>("/assistant/chat", {
+      message: cleanMessage,
+      history,
+      context: { page: pathname }
+    });
     if (result.ok) {
-      setMessages((previous) => [...previous, { role: "assistant", content: result.data.answer, evidence: result.data.evidence, nextActions: result.data.nextActions }]);
+      setMessages((previous) => [...previous, {
+        role: "assistant",
+        content: result.data.answer,
+        evidence: result.data.evidence,
+        nextActions: result.data.nextActions,
+        retrievalMode: result.data.retrievalMode,
+        retrievedCount: result.data.retrievedCount,
+        confidence: result.data.confidence,
+        grounded: result.data.grounded
+      }]);
       if (!status) void loadStatus();
     } else {
       setError(result.error.message);
@@ -61,17 +78,45 @@ export function AiAssistant({ open, onClose }: { open: boolean; onClose: () => v
 
   if (!open) return null;
 
-  const suggestions = ["What should I collect today?", "Explain my aging risk", "Draft a respectful reminder"];
+  const suggestions = [
+    "What is the name of this workspace?",
+    "What should I collect today?",
+    "Explain my aging risk",
+    "Draft a respectful reminder"
+  ];
+  const modeLabel = status?.mode === "live"
+    ? "Live LLM - grounded retrieval"
+    : status?.mode === "fallback"
+      ? "Guided fallback - grounded retrieval"
+      : "Workspace-grounded assistant";
 
   return <aside className="ai-drawer" aria-label="DuePilot AI assistant">
-    <header><div><span className="ai-overline"><ProductIcon name="sparkle" /> Finance intelligence</span><h2>Ask DuePilot</h2><p>Clear guidance grounded in your workspace.</p></div><div className="ai-header-actions"><button type="button" className="ai-clear" onClick={() => setMessages([])} disabled={!messages.length}>Clear chat</button><button type="button" className="icon-button" onClick={onClose} aria-label="Close assistant"><ProductIcon name="close" /></button></div></header>
-    <div className="ai-mode"><i /><span>{status?.mode === "live" ? "Live AI connected" : "Guided workspace mode"}</span><small>{status?.model || "Secure server-side"}</small></div>
-    <div className="ai-messages" aria-live="polite">
+    <header>
+      <div>
+        <span className="ai-overline"><ProductIcon name="sparkle" /> Finance intelligence</span>
+        <h2>Ask DuePilot</h2>
+        <p>Clear guidance grounded in your workspace.</p>
+      </div>
+      <div className="ai-header-actions">
+        <button type="button" className="ai-clear" onClick={() => setMessages([])} disabled={!messages.length}>Clear chat</button>
+        <button type="button" className="icon-button" onClick={onClose} aria-label="Close assistant"><ProductIcon name="close" /></button>
+      </div>
+    </header>
+    <div className="ai-mode"><i /><span>{modeLabel}</span><small>{status?.model || "Secure server-side"}</small></div>
+    <div className="ai-messages" aria-live="polite" aria-busy={pending}>
       {!messages.length && <div className="ai-welcome"><span className="ai-orb"><ProductIcon name="sparkle" /></span><h3>What needs attention?</h3><p>I read the current workspace context, cite the evidence used, and keep provider credentials on the server.</p><div>{suggestions.map((item) => <button key={item} type="button" onClick={() => void ask(item)}><ProductIcon name="arrow" />{item}</button>)}</div></div>}
-      {messages.map((message, index) => <article className={message.role} key={`${message.role}-${index}`}><small>{message.role === "assistant" ? "DuePilot intelligence" : "You"}</small><p>{message.content}</p>{message.role === "assistant" && <>{Boolean(message.evidence?.length) && <div className="ai-evidence"><strong>Workspace evidence</strong>{message.evidence?.map((item) => <span key={`${item.source}-${item.type}`}><i /><b>{item.source}</b><small>{item.detail}</small></span>)}</div>}{Boolean(message.nextActions?.length) && <div className="ai-next"><strong>Recommended next moves</strong><ol>{message.nextActions?.map((item) => <li key={item}>{item}</li>)}</ol></div>}</>}</article>)}
-      {pending && <article className="assistant pending"><small>DuePilot intelligence</small><p>Reviewing the relevant receivables and activity…</p></article>}
+      {messages.map((message, index) => <article className={message.role} key={`${message.role}-${index}`}>
+        <small>{message.role === "assistant" ? "DuePilot intelligence" : "You"}</small>
+        <p>{message.content}</p>
+        {message.role === "assistant" && <>
+          {Boolean(message.retrievedCount) && <div className="ai-grounding"><ProductIcon name="check" /> Grounded in {message.retrievedCount} workspace source{message.retrievedCount === 1 ? "" : "s"}{message.confidence ? ` - ${Math.round(message.confidence * 100)}% retrieval confidence` : ""}</div>}
+          {Boolean(message.evidence?.length) && <div className="ai-evidence"><strong>Workspace evidence</strong>{message.evidence?.map((item) => <span key={`${item.source}-${item.type}`}><i /><b>{item.source}</b><small>{item.detail}</small></span>)}</div>}
+          {Boolean(message.nextActions?.length) && <div className="ai-next"><strong>Recommended next moves</strong><ol>{message.nextActions?.map((item) => <li key={item}>{item}</li>)}</ol></div>}
+        </>}
+      </article>)}
+      {pending && <article className="assistant pending"><small>DuePilot intelligence</small><p>Reviewing the relevant receivables and activity...</p></article>}
       {error && <div className="ai-error" role="alert">{error}</div>}
     </div>
-    <form onSubmit={submit}><textarea name="message" aria-label="Message DuePilot AI" required maxLength={2000} placeholder="Ask about priorities, a customer, or a payment follow-up…" /><footer><small>Review financial decisions before acting.</small><button disabled={pending} className="button button-primary">Send <ProductIcon name="arrow" /></button></footer></form>
+    <form onSubmit={submit}><textarea name="message" aria-label="Message DuePilot AI" required maxLength={2000} placeholder="Ask about priorities, a customer, or a payment follow-up..." /><footer><small>Review financial decisions before acting.</small><button disabled={pending} className="button button-primary">Send <ProductIcon name="arrow" /></button></footer></form>
   </aside>;
 }

@@ -72,3 +72,26 @@ export type AdminOverview = { metrics: { workspaceCount: number; userCount: numb
 export type AssistantStatus = { enabled: boolean; configured: boolean; keyCount: number; provider: string; model: string; mode: string };
 export type AssistantEvidence = { source: string; type: string; detail: string; values: unknown };
 export type AssistantAnswer = { answer: string; provider: string; model: string; mode: string; configured: boolean; evidence?: AssistantEvidence[]; nextActions?: string[] };
+export type PersonalProfile = { displayName: string; mobileLast4: string; mobileVerified: boolean };
+export type PersonalObligation = {
+  id: string;
+  providerName: string;
+  category: string;
+  title: string;
+  externalReference: string;
+  amount: number;
+  paidAmount: number;
+  balance: number;
+  currency: string;
+  issueDate: string;
+  dueDate: string;
+  status: string;
+  daysUntilDue: number;
+  daysOverdue: number;
+};
+export type PersonalSummary = {
+  profile: PersonalProfile;
+  connections: { id: string; providerName: string; category: string; status: string; lastSyncedAt: string }[];
+  obligations: PersonalObligation[];
+  summary: { totalOpen: number; overdueAmount: number; overdueCount: number; dueSoonAmount: number; paidAmount: number };
+};

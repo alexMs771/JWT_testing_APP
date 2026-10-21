@@ -54,6 +54,16 @@ component singleton {
 		throw(type="DuePilot.PersistenceRequired",message="Personal obligations require PostgreSQL persistence mode.");
 	}
 
+	public struct function updatePersonalProfile(required string displayName, required string mobile){
+		if(isPostgresMode()) return postgresRepository.updatePersonalProfile(arguments.displayName,arguments.mobile);
+		throw(type="DuePilot.PersistenceRequired",message="Personal profiles require PostgreSQL persistence mode.");
+	}
+
+	public struct function createPersonalObligation(required string providerName,required string category,required string title,required string externalReference,required numeric amount,required string dueDate,string issueDate="",string currency="INR"){
+		if(isPostgresMode()) return postgresRepository.createPersonalObligation(argumentCollection=arguments);
+		throw(type="DuePilot.PersistenceRequired",message="Personal obligations require PostgreSQL persistence mode.");
+	}
+
 	public struct function createCustomer(required string name,string contactName="",string email="",string phone="",string externalReference=""){
 		if(isPostgresMode()) return postgresRepository.createCustomer(arguments.name,arguments.contactName,arguments.email,arguments.phone,arguments.externalReference);
 		throw(type="DuePilot.PersistenceRequired",message="Customer creation requires PostgreSQL persistence mode.");

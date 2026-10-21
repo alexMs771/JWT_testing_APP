@@ -1,9 +1,36 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useSyncExternalStore } from "react";
+
+const THEME_EVENT = "duepilot-theme-change";
+
+function getThemeSnapshot() {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem("duepilot-theme") === "dark";
+  } catch {
+    return false;
+  }
+}
+
+function subscribeToTheme(onChange: () => void) {
+  const notify = () => onChange();
+  window.addEventListener("storage", notify);
+  window.addEventListener(THEME_EVENT, notify);
+  return () => {
+    window.removeEventListener("storage", notify);
+    window.removeEventListener(THEME_EVENT, notify);
+  };
+}
+
+function getServerThemeSnapshot() {
+  return false;
+}
 
 export function ThemeToggle({ className = "" }: { className?: string }) {
-  const [dark, setDark] = useState(() => typeof window !== "undefined" && localStorage.getItem("duepilot-theme") === "dark");
+  // useSyncExternalStore guarantees the same snapshot during SSR and the
+  // hydration pass, then reads the saved browser preference safely afterward.
+  const dark = useSyncExternalStore(subscribeToTheme, getThemeSnapshot, getServerThemeSnapshot);
 
   useEffect(() => {
     document.documentElement.dataset.theme = dark ? "dark" : "light";
@@ -11,9 +38,13 @@ export function ThemeToggle({ className = "" }: { className?: string }) {
 
   function toggleTheme() {
     const next = !dark;
-    setDark(next);
     document.documentElement.dataset.theme = next ? "dark" : "light";
-    localStorage.setItem("duepilot-theme", next ? "dark" : "light");
+    try {
+      window.localStorage.setItem("duepilot-theme", next ? "dark" : "light");
+      window.dispatchEvent(new Event(THEME_EVENT));
+    } catch {
+      // The visual toggle still works when browser storage is unavailable.
+    }
   }
 
   return <button className={`theme-switch ${dark ? "is-dark" : ""} ${className}`} type="button" onClick={toggleTheme} aria-label={`Switch to ${dark ? "light" : "dark"} mode`} aria-pressed={dark} title={`Switch to ${dark ? "light" : "dark"} mode`} suppressHydrationWarning>

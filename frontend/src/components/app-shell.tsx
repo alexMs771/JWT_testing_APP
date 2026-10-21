@@ -16,6 +16,7 @@ const navigation = [
   ["/app/customers", "Customers", "customers"],
   ["/app/collections", "Collections", "collections"],
   ["/app/reports", "Reports", "reports"],
+  ["/app/personal", "Personal dues", "invoices"],
   ["/app/profile", "Profile", "settings"],
 ] as const;
 
@@ -79,14 +80,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     {sidebarOpen && <button className="sidebar-scrim" aria-label="Close navigation" onClick={() => setSidebarOpen(false)} />}
     <aside className={`app-sidebar ${sidebarOpen ? "open" : ""}`}>
       <Link href="/app/dashboard" className="sidebar-logo" aria-label="DuePilot dashboard">
-        <Image src="/duepilot-logo.svg" alt="DuePilot" width={116} height={83} priority />
+        <span className="sidebar-logo-mark" aria-hidden="true">
+          <Image src="/duepilot-reference.png" alt="" width={68} height={66} priority />
+        </span>
+        <span className="sidebar-logo-word">DuePilot</span>
       </Link>
       <div className="workspace-card"><span>{session.workspace.initials}</span><div><strong>{session.workspace.name}</strong><small>{session.workspace.plan} workspace</small></div><i aria-hidden="true">⌄</i></div>
       <nav aria-label="Workspace navigation">
         <small>OPERATIONS</small>
         {navigation.slice(0, 4).map(([href, label, icon]) => <Link key={href} href={href} onClick={() => setSidebarOpen(false)} className={isActive(href) ? "active" : ""}><ProductIcon name={icon} /><span>{label}</span></Link>)}
         <small>INTELLIGENCE</small>
-        {navigation.slice(4).map(([href, label, icon]) => <Link key={href} href={href} onClick={() => setSidebarOpen(false)} className={isActive(href) ? "active" : ""}><ProductIcon name={icon} /><span>{label}</span></Link>)}
+        {navigation.slice(4, 6).map(([href, label, icon]) => <Link key={href} href={href} onClick={() => setSidebarOpen(false)} className={isActive(href) ? "active" : ""}><ProductIcon name={icon} /><span>{label}</span></Link>)}
+        <small>ACCOUNT</small>
+        {navigation.slice(6).map(([href, label, icon]) => <Link key={href} href={href} onClick={() => setSidebarOpen(false)} className={isActive(href) ? "active" : ""}><ProductIcon name={icon} /><span>{label}</span></Link>)}
         <Link href="/app/settings" onClick={() => setSidebarOpen(false)} className={isActive("/app/settings") ? "active" : ""}><ProductIcon name="settings" /><span>Settings</span></Link>
       </nav>
       <Link href="/" className="sidebar-public-link"><span aria-hidden="true">←</span> Back to public site</Link>

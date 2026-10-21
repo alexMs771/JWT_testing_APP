@@ -63,6 +63,49 @@ component singleton {
 		return {profile:profile,connections:connections,obligations:obligations,summary:{totalOpen:totalOpen,overdueAmount:overdueAmount,overdueCount:overdueCount,dueSoonAmount:dueSoonAmount,paidAmount:paidAmount}};
 	}
 
+	public struct function updatePersonalProfile(required string displayName, required string mobile){
+		var cleanName=trim(reReplace(arguments.displayName,"[[:space:]]+"," ","all"));
+		if(len(cleanName)<2||len(cleanName)>120) throw(type="DuePilot.InvalidPersonalProfile",message="Display name must be between 2 and 120 characters.");
+		var mobileValue=reReplace(trim(arguments.mobile),"[^0-9+]","","all");
+		if(reFind("^[6-9][0-9]{9}$",mobileValue)) mobileValue="+91"&mobileValue;
+		if(len(mobileValue)&&!reFind("^[+][1-9][0-9]{7,14}$",mobileValue)) throw(type="DuePilot.InvalidMobile",message="Enter a valid mobile number with country code.");
+		var userId=personalUserId();
+		try{
+			run("INSERT INTO personal_profiles(user_id,display_name,mobile_e164) VALUES(:userId,:displayName,:mobile) ON CONFLICT(user_id) DO UPDATE SET display_name=EXCLUDED.display_name,mobile_e164=EXCLUDED.mobile_e164,updated_at=now()",{userId:{value:userId,sqltype:"varchar"},displayName:{value:cleanName,sqltype:"varchar"},mobile:{value:mobileValue,sqltype:"varchar",null:!len(mobileValue)}});
+		}catch(any error){
+			if(findNoCase("duplicate",lCase(error.message))||findNoCase("unique",lCase(error.message))) throw(type="DuePilot.MobileInUse",message="That mobile number is already linked to another DuePilot account.");
+			throw(type="DuePilot.PersonalProfileSaveFailed",message=error.message);
+		}
+		return getPersonalSummary();
+	}
+
+	public struct function createPersonalObligation(required string providerName,required string category,required string title,required string externalReference,required numeric amount,required string dueDate,string issueDate="",string currency="INR"){
+		var provider=trim(reReplace(arguments.providerName,"[[:space:]]+"," ","all"));
+		var obligationCategory=lCase(trim(arguments.category));
+		var obligationTitle=trim(reReplace(arguments.title,"[[:space:]]+"," ","all"));
+		var reference=trim(arguments.externalReference);
+		var money=val(arguments.amount);
+		var due=trim(arguments.dueDate);
+		var issue=trim(arguments.issueDate);
+		var moneyCurrency=uCase(trim(arguments.currency));
+		if(len(provider)<2||len(provider)>160) throw(type="DuePilot.InvalidPersonalObligation",message="Provider name must be between 2 and 160 characters.");
+		if(!listFindNoCase("utilities,vehicle,government,recharge,subscriptions,housing,education,healthcare,other",obligationCategory)) throw(type="DuePilot.InvalidPersonalObligation",message="Choose a valid due category.");
+		if(len(obligationTitle)<2||len(obligationTitle)>180) throw(type="DuePilot.InvalidPersonalObligation",message="Due title must be between 2 and 180 characters.");
+		if(len(reference)<2||len(reference)>180) throw(type="DuePilot.InvalidPersonalObligation",message="Reference must be between 2 and 180 characters.");
+		if(money<=0||money>999999999) throw(type="DuePilot.InvalidPersonalObligation",message="Amount must be greater than zero and within the supported limit.");
+		if(!isDate(due)) throw(type="DuePilot.InvalidPersonalObligation",message="Enter a valid due date.");
+		if(len(issue)&&!isDate(issue)) throw(type="DuePilot.InvalidPersonalObligation",message="Enter a valid issue date.");
+		if(!listFindNoCase("INR,USD",moneyCurrency)) throw(type="DuePilot.InvalidPersonalObligation",message="Choose INR or USD as the currency.");
+		var userId=personalUserId();
+		try{
+			run("INSERT INTO personal_obligations(user_id,provider_name,category,title,external_reference,amount,currency,issue_date,due_date,status) VALUES(:userId,:provider,:category,:title,:reference,:amount,:currency,:issueDate,:dueDate,'open')",{userId:{value:userId,sqltype:"varchar"},provider:{value:provider,sqltype:"varchar"},category:{value:obligationCategory,sqltype:"varchar"},title:{value:obligationTitle,sqltype:"varchar"},reference:{value:reference,sqltype:"varchar"},amount:{value:money,sqltype:"decimal"},currency:{value:moneyCurrency,sqltype:"char"},issueDate:{value:issue,sqltype:"date",null:!len(issue)},dueDate:{value:due,sqltype:"date"}});
+		}catch(any error){
+			if(findNoCase("duplicate",lCase(error.message))||findNoCase("unique",lCase(error.message))) throw(type="DuePilot.DuplicatePersonalObligation",message="A due with this provider, reference, and date already exists.");
+			throw(type="DuePilot.PersonalObligationCreateFailed",message=error.message);
+		}
+		return getPersonalSummary();
+	}
+
 	public struct function createCustomer(required string name, string contactName="", string email="", string phone="", string externalReference=""){
 		var cleanName = trim(reReplace(arguments.name,"\\s+"," ","all"));
 		var cleanEmail = lCase(trim(arguments.email));

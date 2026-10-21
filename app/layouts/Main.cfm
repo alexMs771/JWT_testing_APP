@@ -85,7 +85,7 @@
 										<hr class="dropdown-divider">
 									</li>
 									<li class="p-2">
-										<img class="rounded mx-auto block" width="150" src="includes/images/ColdBoxLogo2015_300.png" alt="logo"/>
+										<img class="rounded mx-auto block" width="150" src="assets/brand/duepilot-mark.svg" alt="DuePilot"/>
 									</li>
 								</ul>
 							</li>

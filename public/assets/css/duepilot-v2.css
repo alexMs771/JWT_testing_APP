@@ -65,7 +65,7 @@ code, kbd, pre, .tm-code, .tm-token, .tm-fn-badge, .font-monospace { font-family
 .brand-row { padding: 0 8px 24px; }
 .brand { gap: 11px; font-size: 20px; font-weight: 800; letter-spacing: -.65px; }
 .brand-logo { display: block; width: 100px; height: auto; object-fit: contain; }
-.brand-logo-sidebar { width: 104px; }
+.brand-logo-sidebar { width: 104px; padding: 4px 7px; border-radius: 8px; background: #fff; }
 .brand-logo-header { width: 84px; }
 .brand-logo-auth { width: 124px; }
 .brand-logo-footer { width: 108px; }

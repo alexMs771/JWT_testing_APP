@@ -1,0 +1,106 @@
+/* One self-hosted type system for every DuePilot surface. */
+:root {
+  --font-manrope: "Manrope Variable";
+  --font-product: var(--font-manrope), "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  --font-display: var(--font-manrope), "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+}
+
+html,
+body {
+  font-family: var(--font-product);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body,
+button,
+input,
+select,
+textarea,
+optgroup {
+  font-family: var(--font-product);
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p,
+a,
+button,
+input,
+select,
+textarea,
+label,
+small,
+strong,
+b,
+em,
+li,
+td,
+th,
+dt,
+dd,
+summary {
+  font-family: var(--font-product);
+}
+
+.product-icon {
+  font-family: "Segoe UI Symbol", "Apple Symbols", sans-serif !important;
+}
+
+.landing-page h1,
+.landing-page h2,
+.landing-page h3,
+.hero h1,
+.section-heading h2,
+.workflow-intro h2,
+.trust-card h2,
+.marketing-cta h2,
+.auth-card h1,
+.auth-story h2,
+.page-heading h1,
+.dp-showcase h1,
+.dc-hero h1,
+.dp-role-directory h1,
+.dc-role-page h1,
+.dc-guide h1 {
+  font-family: var(--font-display) !important;
+  font-synthesis: none;
+}
+
+.landing-page h1,
+.hero h1,
+.dp-showcase h1,
+.dc-hero h1 {
+  font-weight: 800;
+}
+
+.landing-page h2,
+.landing-page h3,
+.section-heading h2,
+.workflow-intro h2,
+.trust-card h2,
+.marketing-cta h2,
+.auth-card h1,
+.auth-story h2,
+.page-heading h1,
+.dp-role-directory h1,
+.dc-role-page h1,
+.dc-guide h1 {
+  font-weight: 700;
+}
+
+.demo-page,
+.dc-marketing,
+.dc-role-page,
+.dc-app,
+.app-shell,
+.admin-page,
+.auth-page {
+  font-family: var(--font-product);
+}

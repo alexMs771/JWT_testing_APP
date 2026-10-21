@@ -1,0 +1,5 @@
+/* The workspace brand is composed from separate, precisely aligned mark and wordmark elements. */
+.app-sidebar .sidebar-logo {
+  display: inline-flex;
+  align-items: center;
+}

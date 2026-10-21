@@ -44,6 +44,8 @@ component {
         route('/api/v1/auth/me', 'apiV1.me').end();
         route('/api/v1/workspace/context', 'apiV1.workspaceContext').end();
         route('/api/v1/personal/summary', 'apiV1.personalSummary').end();
+        route('/api/v1/personal/profile', 'apiV1.personalProfile').end();
+        route('/api/v1/personal/obligations', 'apiV1.personalObligations').end();
         route('/api/v1/profile/photo/remove', 'apiV1.removeProfilePhoto').end();
         route('/api/v1/profile/photo', 'apiV1.saveProfilePhoto').end();
         route('/api/v1/profile', 'apiV1.profile').end();

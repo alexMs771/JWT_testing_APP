@@ -38,12 +38,12 @@ component extends="coldbox.system.EventHandler" {
                 'Enter a valid work email address.'
             );
         }
-        if (len(password) < 6 || len(password) > 200) {
+        if (len(password) < 12 || len(password) > 200) {
             return failure(
                 event,
                 400,
                 'INVALID_LOGIN_REQUEST',
-                'Password must contain between 6 and 200 characters.'
+                'Password must contain between 12 and 200 characters.'
             );
         }
 
@@ -161,12 +161,7 @@ component extends="coldbox.system.EventHandler" {
                 201
             );
         } catch (any error) {
-            return failure(
-                event,
-                422,
-                'REGISTRATION_VALIDATION_FAILED',
-                error.message
-            );
+            return failureForError(event, 422, 'REGISTRATION_VALIDATION_FAILED', error);
         }
     }
 
@@ -202,6 +197,55 @@ component extends="coldbox.system.EventHandler" {
         }
     }
 
+    function personalProfile(event, rc, prc) {
+        if (!requireAuthentication(event)) return request.duePilotApiResponse;
+        var method = uCase(cgi.request_method ?: 'GET');
+        var summary = {};
+        try { summary = duePilotService.getPersonalSummary(); } catch (any error) { return failure(event, 422, 'PERSONAL_PROFILE_UNAVAILABLE', error.message); }
+        if (method == 'GET') return success(event, summary.profile);
+        if (method != 'POST') return failure(event, 405, 'METHOD_NOT_ALLOWED', 'This endpoint supports GET and POST.');
+        if (!requireCsrf(event)) return request.duePilotApiResponse;
+        param rc.displayName = session.user.name ?: '';
+        param rc.mobile = '';
+        try {
+            summary = duePilotService.updatePersonalProfile(rc.displayName, rc.mobile);
+            return success(event, summary.profile);
+        } catch (any error) {
+            return failureForError(event, 422, 'PERSONAL_PROFILE_INVALID', error);
+        }
+    }
+
+    function personalObligations(event, rc, prc) {
+        if (!requireAuthentication(event)) return request.duePilotApiResponse;
+        var method = uCase(cgi.request_method ?: 'GET');
+        try {
+            if (method == 'GET') return success(event, duePilotService.getPersonalSummary().obligations);
+            if (method != 'POST') return failure(event, 405, 'METHOD_NOT_ALLOWED', 'This endpoint supports GET and POST.');
+            if (!requireCsrf(event)) return request.duePilotApiResponse;
+            param rc.providerName = '';
+            param rc.category = 'other';
+            param rc.title = '';
+            param rc.externalReference = '';
+            param rc.amount = 0;
+            param rc.dueDate = '';
+            param rc.issueDate = '';
+            param rc.currency = 'INR';
+            var summary = duePilotService.createPersonalObligation(
+                providerName = rc.providerName,
+                category = rc.category,
+                title = rc.title,
+                externalReference = rc.externalReference,
+                amount = val(rc.amount),
+                dueDate = rc.dueDate,
+                issueDate = rc.issueDate,
+                currency = rc.currency
+            );
+            return success(event, summary);
+        } catch (any error) {
+            return failureForError(event, 422, 'PERSONAL_OBLIGATION_INVALID', error);
+        }
+    }
+
     function logout(event, rc, prc) {
         if (!requireMethod(event, 'POST')) return request.duePilotApiResponse;
         if (!requireAuthentication(event) || !requireCsrf(event)) return request.duePilotApiResponse;
@@ -233,12 +277,7 @@ component extends="coldbox.system.EventHandler" {
             session.user.initials = profile.initials;
             return success(event, profile);
         } catch (any error) {
-            return failure(
-                event,
-                422,
-                'PROFILE_VALIDATION_FAILED',
-                error.message
-            );
+            return failureForError(event, 422, 'PROFILE_VALIDATION_FAILED', error);
         }
     }
 
@@ -250,12 +289,7 @@ component extends="coldbox.system.EventHandler" {
         try {
             return success(event, authService.saveProfilePhoto(session.user.id, rc.contentType, rc.imageBase64));
         } catch (any error) {
-            return failure(
-                event,
-                422,
-                'PROFILE_PHOTO_INVALID',
-                error.message
-            );
+            return failureForError(event, 422, 'PROFILE_PHOTO_INVALID', error);
         }
     }
 
@@ -276,12 +310,7 @@ component extends="coldbox.system.EventHandler" {
             }
             return success(event, {deleted: true});
         } catch (any error) {
-            return failure(
-                event,
-                422,
-                'WORKSPACE_DELETE_FAILED',
-                error.message
-            );
+            return failureForError(event, 422, 'WORKSPACE_DELETE_FAILED', error);
         }
     }
 
@@ -297,12 +326,7 @@ component extends="coldbox.system.EventHandler" {
             authService.adminDeleteWorkspace(rc.workspaceId ?: '', session.user.id);
             return success(event, {deleted: true});
         } catch (any error) {
-            return failure(
-                event,
-                422,
-                'ADMIN_WORKSPACE_DELETE_FAILED',
-                error.message
-            );
+            return failureForError(event, 422, 'ADMIN_WORKSPACE_DELETE_FAILED', error);
         }
     }
 
@@ -334,12 +358,7 @@ component extends="coldbox.system.EventHandler" {
                 );
                 return success(event, created, {}, 201);
             } catch (any error) {
-                return failure(
-                    event,
-                    422,
-                    'INVOICE_VALIDATION_FAILED',
-                    error.message
-                );
+                return failureForError(event, 422, 'INVOICE_VALIDATION_FAILED', error);
             }
         }
         if (method != 'GET') {
@@ -368,12 +387,7 @@ component extends="coldbox.system.EventHandler" {
         try {
             return success(event, duePilotService.recordPayment(rc.invoiceId ?: '', val(rc.amount), rc.reference));
         } catch (any error) {
-            return failure(
-                event,
-                422,
-                'PAYMENT_VALIDATION_FAILED',
-                error.message
-            );
+            return failureForError(event, 422, 'PAYMENT_VALIDATION_FAILED', error);
         }
     }
 
@@ -385,12 +399,7 @@ component extends="coldbox.system.EventHandler" {
         try {
             return success(event, duePilotService.savePromise(rc.invoiceId ?: '', rc.promiseDate, rc.note));
         } catch (any error) {
-            return failure(
-                event,
-                422,
-                'PROMISE_VALIDATION_FAILED',
-                error.message
-            );
+            return failureForError(event, 422, 'PROMISE_VALIDATION_FAILED', error);
         }
     }
 
@@ -401,12 +410,7 @@ component extends="coldbox.system.EventHandler" {
         try {
             return success(event, duePilotService.openDispute(rc.invoiceId ?: '', rc.reason));
         } catch (any error) {
-            return failure(
-                event,
-                422,
-                'DISPUTE_VALIDATION_FAILED',
-                error.message
-            );
+            return failureForError(event, 422, 'DISPUTE_VALIDATION_FAILED', error);
         }
     }
 
@@ -417,12 +421,7 @@ component extends="coldbox.system.EventHandler" {
         try {
             return success(event, duePilotService.sendReminder(rc.invoiceId ?: '', rc.channel));
         } catch (any error) {
-            return failure(
-                event,
-                422,
-                'REMINDER_VALIDATION_FAILED',
-                error.message
-            );
+            return failureForError(event, 422, 'REMINDER_VALIDATION_FAILED', error);
         }
     }
 
@@ -465,12 +464,7 @@ component extends="coldbox.system.EventHandler" {
                     201
                 );
             } catch (any error) {
-                return failure(
-                    event,
-                    422,
-                    'CUSTOMER_VALIDATION_FAILED',
-                    error.message
-                );
+                return failureForError(event, 422, 'CUSTOMER_VALIDATION_FAILED', error);
             }
         }
         if (method != 'GET') return request.duePilotApiResponse;
@@ -513,12 +507,7 @@ component extends="coldbox.system.EventHandler" {
                 )
             );
         } catch (any error) {
-            return failure(
-                event,
-                422,
-                'WORKSPACE_VALIDATION_FAILED',
-                error.message
-            );
+            return failureForError(event, 422, 'WORKSPACE_VALIDATION_FAILED', error);
         }
     }
 
@@ -710,6 +699,41 @@ component extends="coldbox.system.EventHandler" {
         return false;
     }
 
+    /**
+     * Translate domain failures into stable HTTP semantics without exposing
+     * database/provider internals to the client.
+     */
+    private numeric function statusForError(required any error, numeric fallbackStatus = 422) {
+        var errorType = '';
+        if (isStruct(arguments.error) && structKeyExists(arguments.error, 'type')) {
+            errorType = lCase(toString(arguments.error.type));
+        }
+        if (findNoCase('notfound', errorType)) return 404;
+        if (findNoCase('forbidden', errorType)) return 403;
+        if (
+            findNoCase('duplicate', errorType)
+            || findNoCase('emailinuse', errorType)
+            || findNoCase('mobileinuse', errorType)
+            || findNoCase('alreadypaid', errorType)
+            || findNoCase('overpayment', errorType)
+        ) return 409;
+        return arguments.fallbackStatus;
+    }
+
+    private any function failureForError(
+        required any event,
+        required numeric fallbackStatus,
+        required string code,
+        required any error
+    ) {
+        return failure(
+            arguments.event,
+            statusForError(arguments.error, arguments.fallbackStatus),
+            arguments.code,
+            arguments.error.message
+        );
+    }
+
     private any function success(
         required any event,
         required any data,
@@ -722,6 +746,8 @@ component extends="coldbox.system.EventHandler" {
         responseMeta.timestamp = dateTimeFormat(dateConvert('local2utc', now()), 'yyyy-mm-dd''T''HH:nn:ss''Z''');
         arguments.event.setHTTPHeader(statusCode = arguments.statusCode);
         arguments.event.setHTTPHeader(name = 'Content-Type', value = 'application/json; charset=utf-8');
+        arguments.event.setHTTPHeader(name = 'Cache-Control', value = 'no-store');
+        arguments.event.setHTTPHeader(name = 'X-Content-Type-Options', value = 'nosniff');
         var responseBody = jsonSerialize(toApiCase({'ok': true, 'data': arguments.data, 'meta': responseMeta}));
         request.duePilotApiResponse = responseBody;
         return responseBody;
@@ -736,6 +762,8 @@ component extends="coldbox.system.EventHandler" {
     ) {
         arguments.event.setHTTPHeader(statusCode = arguments.statusCode);
         arguments.event.setHTTPHeader(name = 'Content-Type', value = 'application/json; charset=utf-8');
+        arguments.event.setHTTPHeader(name = 'Cache-Control', value = 'no-store');
+        arguments.event.setHTTPHeader(name = 'X-Content-Type-Options', value = 'nosniff');
         var responseBody = jsonSerialize(
             toApiCase({
                 'ok': false,
@@ -777,7 +805,8 @@ component extends="coldbox.system.EventHandler" {
             'contact,phone,color,avgDaysLate,invoiceCount,overdue,paid,health,' &
             'topCustomers,avgDaysToPay,promiseKept,monthly,billed,collected,filters,search,' &
             'enabled,configured,keyCount,provider,model,mode,answer,evidence,nextActions,source,' &
-            'financeEmail,defaultTerms,photoUrl,createdAt,lastLogin,deleted,workspaceCount,userCount,loginsToday,invoiceCount,workspaces,loginEvents,slug,memberCount,usage30d,outcome'
+            'financeEmail,defaultTerms,photoUrl,createdAt,lastLogin,deleted,workspaceCount,userCount,loginsToday,invoiceCount,workspaces,loginEvents,slug,memberCount,usage30d,outcome,' &
+            'profile,connections,obligations,summary,displayName,mobileLast4,mobileVerified,providerName,category,externalReference,balance,daysUntilDue,daysOverdue'
         );
         var keyMap = structNew('casesensitive');
         for (var canonicalName in canonicalNames) {
